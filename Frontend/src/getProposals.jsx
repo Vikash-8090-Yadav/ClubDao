@@ -1,102 +1,107 @@
-
-import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import React, { useState, useEffect } from 'react';
 import { marketplaceAddress } from './config';
-import {Web3} from 'web3';
-import $ from 'jquery'; 
-import ABI from "./SmartContract/artifacts/contracts/InvestmentClub.sol/InvestmentClub.json"
+import { Web3 } from 'web3';
+import $ from 'jquery';
+import ABI from "./SmartContract/artifacts/contracts/InvestmentClub.sol/InvestmentClub.json";
 
+const web3 = new Web3(new Web3.providers.HttpProvider("https://lightnode-json-rpc-story.grandvalleys.com"));
 
-const web3 = new Web3(new Web3.providers.HttpProvider("https://rpc.testnet.citrea.xyz"));
-var contractPublic = null;
+const GetProposals = () => {
+  const [address, setAddress] = useState('');
+  const [contractPublic, setContractPublic] = useState(null);
 
-async function getContract(userAddress) {
-    contractPublic = await new web3.eth.Contract(ABI.abi,marketplaceAddress);
-    console.log(contractPublic)
-    if(userAddress != null && userAddress != undefined) {
-      contractPublic.defaultAccount = userAddress;
-    }
-  }
-
-window.changeProposal=(proposalId)=> {
-    localStorage.setItem("proposalId",proposalId);
-    console.log(localStorage.getItem("proposalId"))
-    window.location.href = "proposal";
-  }
-
-
-  async function GetProposals() {
-    function changeProposal(proposalId){
-      localStorage.setItem("proposalId",proposalId);
-      console.log(localStorage.getItem("proposalId"))
-      window.location.href = "proposal";
-    }
-    var walletAddress = localStorage.getItem("filWalletAddress");
-    await getContract(walletAddress);
-    if(contractPublic != undefined) {
-      var clubId = localStorage.getItem("clubId");
-      var clubs = await contractPublic.methods.getProposalsByClub(clubId).call();
-      if(clubs.length > 0) {
-  
-        var list = document.querySelector('.available_proposals');
-          var table = document.createElement('table');
-          var thead = document.createElement('thead');
-          var tbody = document.createElement('tbody');
-  
-          var theadTr = document.createElement('tr');
-          var balanceHeader = document.createElement('th');
-          balanceHeader.innerHTML = 'ID';
-          theadTr.appendChild(balanceHeader);
-          var contractNameHeader = document.createElement('th');
-          contractNameHeader.innerHTML = 'Description';
-          theadTr.appendChild(contractNameHeader);
-          var contractTickerHeader = document.createElement('th');
-          contractTickerHeader.innerHTML = 'Amount ( CBTC )';
-          theadTr.appendChild(contractTickerHeader);
-          
-  
-          var usdHeader2 = document.createElement('th');
-          usdHeader2.innerHTML = 'Proposal Status';
-          theadTr.appendChild(usdHeader2);
-
-          
-  
-          thead.appendChild(theadTr)
-  
-          table.className = 'table';
-          table.appendChild(thead);
-  
-        clubs.forEach((valor, clave) => {
-          var tbodyTr = document.createElement('tr');
-          var contractTd = document.createElement('td');
-          var clubLink = document.createElement('a');
-          clubLink.className = 'btn btn-success';
-          clubLink.textContent = valor.id;
-          clubLink.addEventListener('click', function() {
-            changeProposal(valor.id);
-          });
-
-          contractTd.innerHTML = "<a class='btn btn-success' onclick='changeProposal(" + valor.id + ")'>"+valor.id+"</a>";
-          tbodyTr.appendChild(clubLink);
-          var contractTickerTd = document.createElement('td');
-          contractTickerTd.innerHTML = '<b>' + valor.description + '</b>';
-          tbodyTr.appendChild(contractTickerTd);
-          var balanceTd = document.createElement('td');
-          // web3.utils.toWei(proposal_amount.toString(), 'ether');
-          balanceTd.innerHTML = '<b>' + web3.utils.fromWei(valor.amount.toString(),'ether')  + '</b>';
-          tbodyTr.appendChild(balanceTd);
-          var balanceUSDTd2 = document.createElement('td');
-          balanceUSDTd2.innerHTML = '<b>' + valor.status+ '</b>';
-          tbodyTr.appendChild(balanceUSDTd2);
-         
-          tbody.appendChild(tbodyTr);
-        });
-  
-        table.appendChild(tbody);
-  
-          list.appendChild(table);
+  const getContract = async (userAddress) => {
+    try {
+      const contract = await new web3.eth.Contract(ABI.abi, marketplaceAddress);
+      if (userAddress != null && userAddress != undefined) {
+        contract.defaultAccount = userAddress;
       }
-      $('.loading_message').css('display','none');
+      setContractPublic(contract);
+    } catch (error) {
+      console.error("Error creating contract instance:", error);
     }
-  }
+  };
 
-export default GetProposals;
+  const changeProposal = (proposalId) => {
+    localStorage.setItem("proposalId", proposalId);
+    window.location.href = "proposal";
+  };
+
+  useEffect(() => {
+    const loadProposals = async () => {
+      const walletAddress = localStorage.getItem("filWalletAddress");
+      await getContract(walletAddress);
+      
+      if (contractPublic) {
+        try {
+          const clubId = localStorage.getItem("clubId");
+          const clubs = await contractPublic.methods.getProposalsByClub(clubId).call();
+          
+          if (clubs.length > 0) {
+            const list = document.querySelector('.available_proposals');
+            const table = document.createElement('table');
+            const thead = document.createElement('thead');
+            const tbody = document.createElement('tbody');
+
+            const theadTr = document.createElement('tr');
+            const balanceHeader = document.createElement('th');
+            balanceHeader.innerHTML = 'ID';
+            theadTr.appendChild(balanceHeader);
+            
+            const contractNameHeader = document.createElement('th');
+            contractNameHeader.innerHTML = 'Description';
+            theadTr.appendChild(contractNameHeader);
+            
+            const contractTickerHeader = document.createElement('th');
+            contractTickerHeader.innerHTML = 'Amount ( IP )';
+            theadTr.appendChild(contractTickerHeader);
+
+            const usdHeader2 = document.createElement('th');
+            usdHeader2.innerHTML = 'Proposal Status';
+            theadTr.appendChild(usdHeader2);
+
+            thead.appendChild(theadTr);
+            table.className = 'table';
+            table.appendChild(thead);
+
+            clubs.forEach((valor) => {
+              const tbodyTr = document.createElement('tr');
+              const clubLink = document.createElement('a');
+              clubLink.className = 'btn btn-success';
+              clubLink.textContent = valor.id;
+              clubLink.addEventListener('click', () => changeProposal(valor.id));
+              tbodyTr.appendChild(clubLink);
+
+              const contractTickerTd = document.createElement('td');
+              contractTickerTd.innerHTML = '<b>' + valor.description + '</b>';
+              tbodyTr.appendChild(contractTickerTd);
+
+              const balanceTd = document.createElement('td');
+              balanceTd.innerHTML = '<b>' + web3.utils.fromWei(valor.amount.toString(), 'ether') + '</b>';
+              tbodyTr.appendChild(balanceTd);
+
+              const balanceUSDTd2 = document.createElement('td');
+              balanceUSDTd2.innerHTML = '<b>' + valor.status + '</b>';
+              tbodyTr.appendChild(balanceUSDTd2);
+
+              tbody.appendChild(tbodyTr);
+            });
+
+            table.appendChild(tbody);
+            list.appendChild(table);
+          }
+          $('.loading_message').css('display', 'none');
+        } catch (error) {
+          console.error("Error fetching proposals:", error);
+          $('.loading_message').text('Error loading proposals. Please try again.');
+        }
+      }
+    };
+
+    loadProposals();
+  }, [contractPublic]);
+
+  return null;
+};
+
+export default GetProposals; 

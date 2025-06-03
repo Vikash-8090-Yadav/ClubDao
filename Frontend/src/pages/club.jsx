@@ -9,12 +9,12 @@ import { notification } from 'antd';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import GetClub from "../getclub";
-
 import GetProposals from "../getProposals";
+import WalletConnectModal from "../components/WalletConnectModal";
 import axios from 'axios';
 import Tg from "../components/toggle";
 const ethers = require("ethers")
-const web3 = new Web3(new Web3.providers.HttpProvider("https://rpc.testnet.citrea.xyz"));
+const web3 = new Web3(new Web3.providers.HttpProvider("https://lightnode-json-rpc-story.grandvalleys.com"));
 var contractPublic = null;
 
 var hash = null;
@@ -31,8 +31,7 @@ async function getContract(userAddress) {
 const provider = new ethers.providers.Web3Provider(window.ethereum);
 
 async function contributeClub() {
- 
-  toast.info('Contribution intiated ...', {
+  toast.info('Contribution initiated ...', {
     position: "top-right",
     autoClose: 15000,
     hideProgressBar: false,
@@ -41,119 +40,75 @@ async function contributeClub() {
     draggable: true,
     progress: undefined,
     theme: "dark",
-    });
+  });
+
   var walletAddress = localStorage.getItem("filWalletAddress");
-  // alert(walletAddress) /// /////
   await getContract(walletAddress);
+  
   $('.successContributeClub').css('display','none');
   $('.errorContributeClub').css('display','none');
+  
   var clubId = localStorage.getItem("clubId");
   var amountAE = $('#aeAmount').val();
-  // alert(amountAE)
-  var password = $('#passwordShowPVContribute').val();
+
   if(amountAE == '' || amountAE <= 0) {
     $('.successContributeClub').css('display','none');
     $('.errorContributeClub').css("display","block");
     $('.errorContributeClub').text("Amount must be more than 0.");
     return;
   }
-  if(password == '') {
-    $('.successContributeClub').css('display','none');
-    $('.errorContributeClub').css("display","block");
-    $('.errorContributeClub').text("Password is invalid");
-    return;
-  }
-  // var my_wallet = web3.eth.accounts.wallet.load(password)[0];
-  const my_wallet = await web3.eth.accounts.wallet.load(password);
- 
-  
-  if(my_wallet !== undefined)
-  {
+
+  try {
     if(clubId != null) {
       $('.successContributeClub').css("display","block");
       $('.successContributeClub').text("Contributing to the club...");
       
       if(contractPublic != undefined) {
-        amountAE  = web3.utils.toWei(amountAE.toString(), 'ether');
-
+        amountAE = web3.utils.toWei(amountAE.toString(), 'ether');
         
-        // alert(amountAE)
-        //await contractPublic.$call('contributeToClub', [clubId])
         try {
-          // alert("Yes");
-          const query = contractPublic.methods.contributeToClub(clubId);
-          const encodedABI = query.encodeABI();
-          const accounts1 = web3.eth.accounts;
+          const abi = ABI.abi;
+          const iface = new ethers.utils.Interface(abi);
+          const encodedData = iface.encodeFunctionData("contributeToClub", [clubId]);
           
+          const signer = provider.getSigner();
+          const tx = {
+            to: marketplaceAddress,
+            data: encodedData,
+            value: amountAE,
+          };
 
+          const txResponse = await signer.sendTransaction(tx);
+          const txReceipt = await txResponse.wait();
 
-            if (web3 && web3.eth) {
-              try {
-                const abi = ABI.abi;
-                    const iface = new ethers.utils.Interface(abi);
-                    const encodedData = iface.encodeFunctionData("contributeToClub", [clubId]);
-                    const GAS_MANAGER_POLICY_ID = "479c3127-fb07-4cc6-abce-d73a447d2c01";
-                
-                    
-                    const signer = provider.getSigner();
+          notification.success({
+            message: 'Transaction Successful',
+            description: (
+              <div>
+                Transaction Hash: <a href={`https://aeneid.storyscan.io/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
+              </div>
+            )
+          });
 
-              console.log("singer",signer);
-              const tx = {
-                to: marketplaceAddress,
-                data: encodedData,
-                value: amountAE,
-
-              };
-              const txResponse = await signer.sendTransaction(tx);
-              const txReceipt = await txResponse.wait();
-
-              notification.success({
-                message: 'Transaction Successful',
-                description: (
-                  <div>
-                    Transaction Hash: <a href={`https://explorer.testnet.citrea.xyz/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
-                  </div>
-                )
-              });
-
-              console.log(txReceipt.transactionHash);
-                
-              } catch (error) {
-
-          toast.error(error);
-                console.error('Error sending signed transaction:', error);
-              }
-            } else {
-
-          toast.error(error);
-              console.error('web3 instance is not properly initialized.');
-            }
-          // var clubId = await this.web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-          console.log('Transaction Receipt:', clubId);
-          
+          $('#aeAmount').val('');
+          $('.errorContributeClub').css('display','none');
+          $('.successContributeClub').css("display","block");
+          $('.successContributeClub').text("You have contributed to the club successfully");
         } catch(e) {
-          console.log(e);
-          toast.error(e);
+          console.error(e);
+          toast.error(e.message || "Error contributing to club");
           $('.successContributeClub').css('display','none');
           $('.errorContributeClub').css("display","block");
-          $('.errorContributeClub').text(e.toString());
-          return;
+          $('.errorContributeClub').text(e.message || "Error contributing to club");
         }
-        
-        
       }
     }
-    $('.errorContributeClub').css('display','none');
-    $('.successContributeClub').css("display","block");
-    $('.successContributeClub').text("You have contributed to the club successfully");
-  } else {
+  } catch(e) {
+    console.error(e);
     $('.successContributeClub').css('display','none');
     $('.errorContributeClub').css("display","block");
-    $('.errorContributeClub').text("Password is invalid");
-    return;
+    $('.errorContributeClub').text("Error: " + (e.message || "Unknown error"));
   }
-  
-
 }
 
 async function leaveClub() {
@@ -246,6 +201,44 @@ async function verifyUserInClub() {
 
 
 function Club() {
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        // Check if window.ethereum exists (Tomo SDK)
+        if (!window.ethereum) {
+          setShowWalletModal(true);
+          return;
+        }
+
+        // Check if wallet is connected
+        const walletAddress = localStorage.getItem("filWalletAddress");
+        if (!walletAddress) {
+          setShowWalletModal(true);
+          return;
+        }
+
+        // If both checks pass, proceed with normal flow
+        const ans = localStorage.getItem("clubverification");
+        const pod = localStorage.getItem("podsi");
+        if(ans == "a"){
+          $('.clubveri').css("display","none");
+          $('.clwr').text('Verification Completed-'+pod);
+        } else {  
+          $('.clubveri').css("display","block");
+        }
+        GetClub();
+        verifyUserInClub();
+      } catch (error) {
+        console.error("Connection check error:", error);
+        setShowWalletModal(true);
+      }
+    };
+
+    checkConnection();
+  }, []);
 
   // getdealId();
 
@@ -328,23 +321,6 @@ function Club() {
   
 
 
-    useEffect(() => {
-        {
-          
-          const ans  = localStorage.getItem("clubverification")
-          const pod = localStorage.getItem("podsi");
-          if(ans == "a"){
-            $('.clubveri').css("display","none");
-            $('.clwr').text('Verification Completed-'+pod);
-          }else{  
-            $('.clubveri').css("display","block");
-          }
-            GetClub();verifyUserInClub();GetProposals();
-        }
-      }, []);
-
-
-      const navigate = useNavigate();
   function Logout(){
     web3.eth.accounts.wallet.clear();
     localStorage.clear();
@@ -356,416 +332,415 @@ function Club() {
 
   return (
     <div id="page-top">
-    <div id="wrapper">
-      {/* Sidebar */}
-      <ul
-        className="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion"
-        id="accordionSidebar"
-      >
-        {/* Sidebar - Brand */}
-        <a
-          className="sidebar-brand d-flex align-items-center justify-content-center"
-          href="/"
+      <WalletConnectModal 
+        isOpen={showWalletModal} 
+        onClose={() => {
+          setShowWalletModal(false);
+          navigate('/login');
+        }} 
+      />
+      <div id="wrapper">
+        {/* Sidebar */}
+        <ul
+          className="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion"
+          id="accordionSidebar"
         >
-          <div className="sidebar-brand-icon rotate-n-15">
-            <i className="fas fa-laugh-wink" />
-          </div>
-          <div className="sidebar-brand-text mx-3">Citrea Club</div>
-        </a>
-        {/* Divider */}
-        <hr className="sidebar-divider my-0" />
-        {/* Nav Item - Dashboard */}
-        <li className="nav-item active">
-        <Link  className="nav-link" to="/">
-          <i className="fas fa-fw fa-tachometer-alt" />
-          <span>Dashboard</span>
-        </Link>
-      </li>
-      <li className="nav-item">
-        <Link  className="nav-link" to="/joinclub">
-          <i className="fas fa-fw fa-file-image-o" />
-          <span>Available clubs</span>
+          {/* Sidebar - Brand */}
+          <a
+            className="sidebar-brand d-flex align-items-center justify-content-center"
+            href="/"
+          >
+            <div className="sidebar-brand-icon rotate-n-15">
+              <i className="fas fa-laugh-wink" />
+            </div>
+            <div className="sidebar-brand-text mx-3">CLUBDAO</div>
+          </a>
+          {/* Divider */}
+          <hr className="sidebar-divider my-0" />
+          {/* Nav Item - Dashboard */}
+          <li className="nav-item active">
+          <Link  className="nav-link" to="/">
+            <i className="fas fa-fw fa-tachometer-alt" />
+            <span>Dashboard</span>
           </Link>
-        
-      </li>
-      <li className="nav-item">
-      <Link  className="nav-link" to="/createclub">
-          <i className="fas fa-fw fa-file-image-o" />
-          <span>Create club</span>
-        </Link>
-      </li>
-      {/* Divider */}
-      <hr className="sidebar-divider d-none d-md-block" />
-      {/* Sidebar Toggler (Sidebar) */}
-      <div className="text-center d-none d-md-inline">
-        <button  onClick={Tg} className="rounded-circle border-0" id="sidebarToggle" />
-      </div>
-    </ul>
-    {/* End of Sidebar */}
-    {/* Content Wrapper */}
-    <div id="content-wrapper" className="d-flex flex-column">
-      {/* Main Content */}
-      <div id="content">
-        {/* Topbar */}
-        
-          {/* End of Topbar */}
-          {/* Begin Page Content */}
-          <div className="container-fluid">
-            {/* Page Heading */}
-            <div className="d-sm-flex align-items-center justify-content-between mb-4">
-              <h1 className="h3 mb-0 text-gray-800">
-                <span className="club_name" />
-              </h1>
-            </div>
-            {/* Content Row */}
-            <div className="row">
-              {/* Earnings (Monthly) Card Example */}
-              <div className="col-xl-2 col-md-6 mb-4">
-                <div className="card border-left-primary shadow h-100 py-2">
-                  <div className="card-body">
-                    <div className="row no-gutters align-items-center">
-                      <div className="col mr-2">
-                        <div className="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                          Club Balance (CBTC)
+        </li>
+        <li className="nav-item">
+          <Link  className="nav-link" to="/joinclub">
+            <i className="fas fa-fw fa-file-image-o" />
+            <span>Available clubs</span>
+            </Link>
+          
+        </li>
+        <li className="nav-item">
+        <Link  className="nav-link" to="/createclub">
+            <i className="fas fa-fw fa-file-image-o" />
+            <span>Create club</span>
+          </Link>
+        </li>
+        {/* Divider */}
+        <hr className="sidebar-divider d-none d-md-block" />
+        {/* Sidebar Toggler (Sidebar) */}
+        <div className="text-center d-none d-md-inline">
+          <button  onClick={Tg} className="rounded-circle border-0" id="sidebarToggle" />
+        </div>
+      </ul>
+      {/* End of Sidebar */}
+      {/* Content Wrapper */}
+      <div id="content-wrapper" className="d-flex flex-column">
+        {/* Main Content */}
+        <div id="content">
+          {/* Topbar */}
+          
+            {/* End of Topbar */}
+            {/* Begin Page Content */}
+            <div className="container-fluid">
+              {/* Page Heading */}
+              <div className="d-sm-flex align-items-center justify-content-between mb-4">
+                <h1 className="h3 mb-0 text-gray-800">
+                  <span className="club_name" />
+                </h1>
+              </div>
+              {/* Content Row */}
+              <div className="row">
+                {/* Earnings (Monthly) Card Example */}
+                <div className="col-xl-2 col-md-6 mb-4">
+                  <div className="card border-left-primary shadow h-100 py-2">
+                    <div className="card-body">
+                      <div className="row no-gutters align-items-center">
+                        <div className="col mr-2">
+                          <div className="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Club Balance (IP)
+                          </div>
+                          <div className="h5 mb-0 font-weight-bold text-gray-800 club_balance">
+                            -
+                          </div>
                         </div>
-                        <div className="h5 mb-0 font-weight-bold text-gray-800 club_balance">
-                          -
+                        <div className="col-auto">
+                          <i className="fas fa-calendar fa-2x text-gray-300" />
                         </div>
-                      </div>
-                      <div className="col-auto">
-                        <i className="fas fa-calendar fa-2x text-gray-300" />
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              <div className="col-xl-2 col-md-6 mb-4">
-                <div className="card border-left-primary shadow h-100 py-2">
-                  <div className="card-body">
-                    <div className="row no-gutters align-items-center">
-                      <div className="col mr-2">
-                        <div className="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                          Proposals
+                <div className="col-xl-2 col-md-6 mb-4">
+                  <div className="card border-left-primary shadow h-100 py-2">
+                    <div className="card-body">
+                      <div className="row no-gutters align-items-center">
+                        <div className="col mr-2">
+                          <div className="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Proposals
+                          </div>
+                          <div className="h5 mb-0 font-weight-bold text-gray-800 club_proposals">
+                            -
+                          </div>
+                          <Link  className="btn btn-secondary btn-sm mt-2" to="/createproposal">
+                         
+                            Create
+                            </Link>
                         </div>
-                        <div className="h5 mb-0 font-weight-bold text-gray-800 club_proposals">
-                          -
+                        <div className="col-auto">
+                          <i className="fas fa-calendar fa-2x text-gray-300" />
                         </div>
-                        <Link  className="btn btn-secondary btn-sm mt-2" to="/createproposal">
-                       
-                          Create
-                          </Link>
-                      </div>
-                      <div className="col-auto">
-                        <i className="fas fa-calendar fa-2x text-gray-300" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="col-xl-2 col-md-6 mb-4">
-                <div className="card border-left-primary shadow h-100 py-2">
-                  <div className="card-body">
-                    <div className="row no-gutters align-items-center">
-                      <div className="col mr-2">
-                        <div className="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                          Members
-                        </div>
-                        <div className="h5 mb-0 font-weight-bold text-gray-800 club_members">
-                          -
-                        </div>
-                        {/* <a href="members.html" class="btn btn-primary btn-sm mt-2">View</a> */}
-                      </div>
-                      <div className="col-auto">
-                        <i className="fas fa-calendar fa-2x text-gray-300" />
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              {/* <div className="col-xl-2 col-md-6 mb-4">
-                <div className="card border-left-primary shadow h-100 py-2">
-                  <div className="card-body">
-                    <div className="row no-gutters align-items-center">
-                      <div className="col mr-2">
-                        <div className="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                         VERIFY YOUR DOCUMENTS (PODSI)
+                <div className="col-xl-2 col-md-6 mb-4">
+                  <div className="card border-left-primary shadow h-100 py-2">
+                    <div className="card-body">
+                      <div className="row no-gutters align-items-center">
+                        <div className="col mr-2">
+                          <div className="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Members
+                          </div>
+                          <div className="h5 mb-0 font-weight-bold text-gray-800 club_members">
+                            -
+                          </div>
+                          {/* <a href="members.html" class="btn btn-primary btn-sm mt-2">View</a> */}
                         </div>
-                       
+                        <div className="col-auto">
+                          <i className="fas fa-calendar fa-2x text-gray-300" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {/* <div className="col-xl-2 col-md-6 mb-4">
+                  <div className="card border-left-primary shadow h-100 py-2">
+                    <div className="card-body">
+                      <div className="row no-gutters align-items-center">
+                        <div className="col mr-2">
+                          <div className="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                           VERIFY YOUR DOCUMENTS (PODSI)
+                          </div>
+                         
 
-                        <div className="h5 mb-0  font-weight-bold text-gray-800 ">
-                          
-                        <input
-                        type="password"
-                        id="verifdocs"
-                        className="form-control form-control-user"
-                        placeholder="Password"
-                      />{" "}
-                        <div  className="btn btn-secondary btn-sm mt-2" onClick={verify}>
-                       
-                          DOCS VERIFICATION
-                          </div>
-                          </div>
-                      </div>
-                      
-                    </div>
-                  </div>
-                </div>
-              </div> */}
-              {/* <div className="col-xl-2 col-md-6 mb-4">
-                <div className="card border-left-primary shadow h-100 py-2">
-                  <div className="card-body">
-                    <div className="row no-gutters align-items-center">
-                      <div className="col mr-2">
-                        <div className="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                         VERIFY YOUR DOCUMENTS (PODSI)
+                          <div className="h5 mb-0  font-weight-bold text-gray-800 ">
+                            
+                          <input
+                          type="password"
+                          id="verifdocs"
+                          className="form-control form-control-user"
+                          placeholder="Password"
+                        />{" "}
+                          <div  className="btn btn-secondary btn-sm mt-2" onClick={verify}>
+                         
+                            DOCS VERIFICATION
+                            </div>
+                            </div>
                         </div>
-                        <div className="h5 mb-0 font-weight-bold text-gray-800 ">
-                          
-                        </div>
-                        <div onClick={getdealId}>
                         
-                        <div id="dealStatusLink" className="btn btn-secondary btn-sm mt-2">
-    DAO DEAL STATUS
-  </div>
-  
-                    
+                      </div>
+                    </div>
+                  </div>
+                </div> */}
+                {/* <div className="col-xl-2 col-md-6 mb-4">
+                  <div className="card border-left-primary shadow h-100 py-2">
+                    <div className="card-body">
+                      <div className="row no-gutters align-items-center">
+                        <div className="col mr-2">
+                          <div className="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                           VERIFY YOUR DOCUMENTS (PODSI)
                           </div>
+                          <div className="h5 mb-0 font-weight-bold text-gray-800 ">
+                            
+                          </div>
+                          <div onClick={getdealId}>
                           
-                      </div>
-                      <div className="col-auto">
-                        <i className="fas fa-calendar fa-2x text-gray-300" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div> */}
-            </div>
-            {/* Content Row */}
-            <div className="row">
-              {/* Area Chart */}
-              <div className="col-xl-8 col-lg-7">
-                <div className="card shadow mb-4">
-                  {/* Card Header - Dropdown */}
-                  <div className="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 className="m-0 font-weight-bold text-primary">
-                      Proposals
-                    </h6>
-                  </div>
-                  {/* Card Body */}
-                  <div className="card-body">
-                    <div className="row available_proposals">
-                      <span className="loading_message">Loading...</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              {/* Pie Chart */}
-              <div className="col-xl-4 col-lg-5">
-                <div
-                  className="card shadow mb-4 join_club"  style={{display: "none"}}
+                          <div id="dealStatusLink" className="btn btn-secondary btn-sm mt-2">
+      DAO DEAL STATUS
+    </div>
+    
                   
-                >
-                  <div className="card-header py-3">
-                    <h6 className="m-0 font-weight-bold text-primary">
-                      Join the club
-                    </h6>
+                        </div>
+                        
+                      </div>
+                    </div>
                   </div>
-                  <div className="card-body">
-                    <p>
-                      
-                      <div id="btnJoinClub" onClick={() => {
-                        joinClub();
-                      }} className="btn btn-success">
-                        Confirm
-                      </div>{" "}
-                      <br />
-                    </p>
-                    <div
-                      className="successJoinLeaveClub valid-feedback"
-                      style={{ display: "none" }}
-                    />
-                    <div
-                      className="errorJoinLeaveClub invalid-feedback"
-                      style={{ display: "none" }}
-                    />
-                    <p />
+                </div> */}
+              </div>
+              {/* Content Row */}
+              <div className="row">
+                {/* Area Chart */}
+                <div className="col-xl-8 col-lg-7">
+                  <div className="card shadow mb-4">
+                    {/* Card Header - Dropdown */}
+                    <div className="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                      <h6 className="m-0 font-weight-bold text-primary">
+                        Proposals
+                      </h6>
+                    </div>
+                    {/* Card Body */}
+                    <div className="card-body">
+                      <div className="row available_proposals">
+                        <span className="loading_message">Loading...</span>
+                        <GetProposals />
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div
-                  className="card shadow mb-4 leave_club"
-                  style={{ display: "none" }}
-                >
-                  <div className="card-header py-3">
-                    <h6 className="m-0 font-weight-bold text-primary">
-                      Contribute to the club
-                    </h6>
+                {/* Pie Chart */}
+                <div className="col-xl-4 col-lg-5">
+                  <div
+                    className="card shadow mb-4 join_club"  style={{display: "none"}}
+                    
+                  >
+                    <div className="card-header py-3">
+                      <h6 className="m-0 font-weight-bold text-primary">
+                        Join the club
+                      </h6>
+                    </div>
+                    <div className="card-body">
+                      <p>
+                        
+                        <div id="btnJoinClub" onClick={() => {
+                          joinClub();
+                        }} className="btn btn-success">
+                          Confirm
+                        </div>{" "}
+                        <br />
+                      </p>
+                      <div
+                        className="successJoinLeaveClub valid-feedback"
+                        style={{ display: "none" }}
+                      />
+                      <div
+                        className="errorJoinLeaveClub invalid-feedback"
+                        style={{ display: "none" }}
+                      />
+                      <p />
+                    </div>
                   </div>
-                  <div className="card-body">
-                    <p>
-                      Amount of CBTC: <br />
-                      <input
-                        type="number"
-                        id="aeAmount"
-                        className="form-control"
-                      />{" "}
-                      <br />
-                      
-                      <a
-                        href="#"
-                        id="btnContributeClub"
-                        onClick={() => {
-                          contributeClub();
-                        }}
-                        className="btn btn-success"
+                  <div
+                    className="card shadow mb-4 leave_club"
+                    style={{ display: "none" }}
+                  >
+                    <div className="card-header py-3">
+                      <h6 className="m-0 font-weight-bold text-primary">
+                        Contribute to the club
+                      </h6>
+                    </div>
+                    <div className="card-body">
+                      <div className="form-group">
+                        <label htmlFor="aeAmount">Amount of IP:</label>
+                        <input
+                          type="number"
+                          id="aeAmount"
+                          className="form-control"
+                          placeholder="Enter amount in IP"
+                          min="0"
+                          step="0.000000000000000001"
+                        />
+                      </div>
+                      <button
+                        onClick={contributeClub}
+                        className="btn btn-success btn-block mt-3"
                       >
-                        Confirm
-                      </a>{" "}
-                      <br />
-                    </p>
-                    <div
-                      className="successContributeClub valid-feedback"
-                      style={{ display: "none" }}
-                    />
-                    <div
-                      className="errorContributeClub invalid-feedback"
-                      style={{ display: "none" }}
-                    />
-                    <p />
+                        Contribute
+                      </button>
+                      <div
+                        className="successContributeClub valid-feedback"
+                        style={{ display: "none" }}
+                      />
+                      <div
+                        className="errorContributeClub invalid-feedback"
+                        style={{ display: "none" }}
+                      />
+                    </div>
                   </div>
-                </div>
-                <div
-                  className="card shadow mb-4 leave_club"
-                  style={{ display: "none" }}
-                >
-                  <div className="card-header py-3">
-                    <h6 className="m-0 font-weight-bold text-primary">
-                      Leave the club
-                    </h6>
-                  </div>
-                  <div className="card-body">
-                    <p>
-                     
-                      <div  id="btnLeaveClub"  onClick={() => {
-                        leaveClub();
-                      }} className="btn btn-success">
-                        Confirm
-                      </div >{" "}
-                      <br />
-                    </p>
-                    <div
-                      className="successJoinLeaveClub valid-feedback"
-                      style={{ display: "none" }}
-                    />
-                    <div
-                      className="errorJoinLeaveClub invalid-feedback"
-                      style={{ display: "none" }}
-                    />
-                    <p />
+                  <div
+                    className="card shadow mb-4 leave_club"
+                    style={{ display: "none" }}
+                  >
+                    <div className="card-header py-3">
+                      <h6 className="m-0 font-weight-bold text-primary">
+                        Leave the club
+                      </h6>
+                    </div>
+                    <div className="card-body">
+                      <p>
+                       
+                        <div  id="btnLeaveClub"  onClick={() => {
+                          leaveClub();
+                        }} className="btn btn-success">
+                          Confirm
+                        </div >{" "}
+                        <br />
+                      </p>
+                      <div
+                        className="successJoinLeaveClub valid-feedback"
+                        style={{ display: "none" }}
+                      />
+                      <div
+                        className="errorJoinLeaveClub invalid-feedback"
+                        style={{ display: "none" }}
+                      />
+                      <p />
+                    </div>
                   </div>
                 </div>
               </div>
+              {/* Content Row */}
+              <div className="row">
+                <div className="col-lg-6 mb-4"></div>
+              </div>
             </div>
-            {/* Content Row */}
-            <div className="row">
-              <div className="col-lg-6 mb-4"></div>
+            {/* /.container-fluid */}
+          </div>
+          {/* End of Main Content */}
+          {/* Footer */}
+          <footer className="sticky-footer bg-white"></footer>
+          {/* End of Footer */}
+        </div>
+        {/* End of Content Wrapper */}
+      </div>
+      {/* End of Page Wrapper */}
+      {/* Scroll to Top Button*/}
+      <a className="scroll-to-top rounded" href="#page-top">
+        <i className="fas fa-angle-up" />
+      </a>
+      {/* Logout Modal*/}
+      <div
+        className="modal fade"
+        id="seeAccountModal"
+        tabIndex={-1}
+        role="dialog"
+        aria-labelledby="exampleModalLabel"
+        aria-hidden="true"
+      >
+        <div className="modal-dialog" role="document">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title" id="exampleModalLabel">
+                Account
+              </h5>
+              <button
+                className="close"
+                type="button"
+                data-dismiss="modal"
+                aria-label="Close"
+              >
+                <span aria-hidden="true">×</span>
+              </button>
+            </div>
+            <div className="modal-body">
+              Address: <br /> <div className="current_account" />
+              <br />
+              <span
+                style={{ fontSize: "x-small" }}
+                className="current_account_text"
+              />
+            </div>
+            <div className="modal-footer"></div>
+          </div>
+        </div>
+      </div>
+      {/* Logout Modal*/}
+      <div
+        className="modal fade"
+        id="logoutModal"
+        tabIndex={-1}
+        role="dialog"
+        aria-labelledby="exampleModalLabel"
+        aria-hidden="true"
+      >
+        <div className="modal-dialog" role="document">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title" id="exampleModalLabel">
+                Ready to Leave?
+              </h5>
+              <button
+                className="close"
+                type="button"
+                data-dismiss="modal"
+                aria-label="Close"
+              >
+                <span aria-hidden="true">×</span>
+              </button>
+            </div>
+            <div className="modal-body">
+              Select "Logout" below if you are ready to end your current session in
+              this browser.
+            </div>
+            <div className="modal-footer">
+              <button
+                className="btn btn-secondary"
+                type="button"
+                data-dismiss="modal"
+              >
+                Cancel
+              </button>
+              <div className="btn btn-primary" onClick={Logout} id="btnLogout">
+              Logout
+            </div>
             </div>
           </div>
-          {/* /.container-fluid */}
-        </div>
-        {/* End of Main Content */}
-        {/* Footer */}
-        <footer className="sticky-footer bg-white"></footer>
-        {/* End of Footer */}
-      </div>
-      {/* End of Content Wrapper */}
-    </div>
-    {/* End of Page Wrapper */}
-    {/* Scroll to Top Button*/}
-    <a className="scroll-to-top rounded" href="#page-top">
-      <i className="fas fa-angle-up" />
-    </a>
-    {/* Logout Modal*/}
-    <div
-      className="modal fade"
-      id="seeAccountModal"
-      tabIndex={-1}
-      role="dialog"
-      aria-labelledby="exampleModalLabel"
-      aria-hidden="true"
-    >
-      <div className="modal-dialog" role="document">
-        <div className="modal-content">
-          <div className="modal-header">
-            <h5 className="modal-title" id="exampleModalLabel">
-              Account
-            </h5>
-            <button
-              className="close"
-              type="button"
-              data-dismiss="modal"
-              aria-label="Close"
-            >
-              <span aria-hidden="true">×</span>
-            </button>
-          </div>
-          <div className="modal-body">
-            Address: <br /> <div className="current_account" />
-            <br />
-            <span
-              style={{ fontSize: "x-small" }}
-              className="current_account_text"
-            />
-          </div>
-          <div className="modal-footer"></div>
         </div>
       </div>
     </div>
-    {/* Logout Modal*/}
-    <div
-      className="modal fade"
-      id="logoutModal"
-      tabIndex={-1}
-      role="dialog"
-      aria-labelledby="exampleModalLabel"
-      aria-hidden="true"
-    >
-      <div className="modal-dialog" role="document">
-        <div className="modal-content">
-          <div className="modal-header">
-            <h5 className="modal-title" id="exampleModalLabel">
-              Ready to Leave?
-            </h5>
-            <button
-              className="close"
-              type="button"
-              data-dismiss="modal"
-              aria-label="Close"
-            >
-              <span aria-hidden="true">×</span>
-            </button>
-          </div>
-          <div className="modal-body">
-            Select "Logout" below if you are ready to end your current session in
-            this browser.
-          </div>
-          <div className="modal-footer">
-            <button
-              className="btn btn-secondary"
-              type="button"
-              data-dismiss="modal"
-            >
-              Cancel
-            </button>
-            <div className="btn btn-primary" onClick={Logout} id="btnLogout">
-            Logout
-          </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  
-  )
+    
+    )
 }
 
 export default Club
