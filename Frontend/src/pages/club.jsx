@@ -14,100 +14,128 @@ import WalletConnectModal from "../components/WalletConnectModal";
 import axios from 'axios';
 import Tg from "../components/toggle";
 const ethers = require("ethers")
-const web3 = new Web3(new Web3.providers.HttpProvider("https://lightnode-json-rpc-story.grandvalleys.com"));
+
+// Initialize Web3 with window.ethereum for MetaMask
+const web3 = new Web3(window.ethereum);
 var contractPublic = null;
 
 var hash = null;
 async function getContract(userAddress) {
-    contractPublic = await new web3.eth.Contract(ABI.abi,marketplaceAddress);
-    console.log(contractPublic)
+  try {
+    contractPublic = new web3.eth.Contract(ABI.abi, marketplaceAddress);
     if(userAddress != null && userAddress != undefined) {
       contractPublic.defaultAccount = userAddress;
     }
+    return contractPublic;
+  } catch (error) {
+    console.error("Error initializing contract:", error);
+    throw error;
   }
-
-
+}
 
 const provider = new ethers.providers.Web3Provider(window.ethereum);
 
 async function contributeClub() {
-  toast.info('Contribution initiated ...', {
-    position: "top-right",
-    autoClose: 15000,
-    hideProgressBar: false,
-    closeOnClick: true,
-    pauseOnHover: true,
-    draggable: true,
-    progress: undefined,
-    theme: "dark",
-  });
-
-  var walletAddress = localStorage.getItem("filWalletAddress");
-  await getContract(walletAddress);
-  
-  $('.successContributeClub').css('display','none');
-  $('.errorContributeClub').css('display','none');
-  
-  var clubId = localStorage.getItem("clubId");
-  var amountAE = $('#aeAmount').val();
-
-  if(amountAE == '' || amountAE <= 0) {
-    $('.successContributeClub').css('display','none');
-    $('.errorContributeClub').css("display","block");
-    $('.errorContributeClub').text("Amount must be more than 0.");
-    return;
-  }
-
   try {
-    if(clubId != null) {
-      $('.successContributeClub').css("display","block");
-      $('.successContributeClub').text("Contributing to the club...");
+    toast.info('Contribution initiated ...', {
+      position: "top-right",
+      autoClose: 15000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+      theme: "dark",
+    });
+
+    const walletAddress = localStorage.getItem("filWalletAddress");
+    if (!walletAddress) {
+      throw new Error("Wallet not connected");
+    }
+
+    await getContract(walletAddress);
+    
+    $('.successContributeClub').css('display','none');
+    $('.errorContributeClub').css('display','none');
+    
+    const clubId = localStorage.getItem("clubId");
+    const amountAE = $('#aeAmount').val();
+
+    if(!amountAE || amountAE <= 0) {
+      throw new Error("Amount must be more than 0");
+    }
+
+    if(!clubId) {
+      throw new Error("Club ID not found");
+    }
+
+    if(!contractPublic) {
+      throw new Error("Contract not initialized");
+    }
+
+    $('.successContributeClub').css("display","block");
+    $('.successContributeClub').text("Contributing to the club...");
+    
+    // Convert amount to Wei
+    const amountInWei = web3.utils.toWei(amountAE.toString(), 'ether');
+    
+    try {
+      // Get the signer from the provider
+      const signer = provider.getSigner();
       
-      if(contractPublic != undefined) {
-        amountAE = web3.utils.toWei(amountAE.toString(), 'ether');
-        
-        try {
-          const abi = ABI.abi;
-          const iface = new ethers.utils.Interface(abi);
-          const encodedData = iface.encodeFunctionData("contributeToClub", [clubId]);
-          
-          const signer = provider.getSigner();
-          const tx = {
-            to: marketplaceAddress,
-            data: encodedData,
-            value: amountAE,
-          };
+      // Create the transaction
+      const tx = {
+        to: marketplaceAddress,
+        data: contractPublic.methods.contributeToClub(clubId).encodeABI(),
+        value: amountInWei,
+        gasLimit: 300000,
+      };
 
-          const txResponse = await signer.sendTransaction(tx);
-          const txReceipt = await txResponse.wait();
+      // Show transaction pending notification
+      toast.info('Transaction pending...', {
+        position: "top-right",
+        autoClose: false,
+        closeOnClick: false,
+      });
 
-          notification.success({
-            message: 'Transaction Successful',
-            description: (
-              <div>
-                Transaction Hash: <a href={`https://aeneid.storyscan.io/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
-              </div>
-            )
-          });
+      // Send transaction
+      const txResponse = await signer.sendTransaction(tx);
+      
+      // Show transaction hash notification
+      toast.info(`Transaction sent! Hash: ${txResponse.hash}`, {
+        position: "top-right",
+        autoClose: 10000,
+      });
 
-          $('#aeAmount').val('');
-          $('.errorContributeClub').css('display','none');
-          $('.successContributeClub').css("display","block");
-          $('.successContributeClub').text("You have contributed to the club successfully");
-        } catch(e) {
-          console.error(e);
-          toast.error(e.message || "Error contributing to club");
-          $('.successContributeClub').css('display','none');
-          $('.errorContributeClub').css("display","block");
-          $('.errorContributeClub').text(e.message || "Error contributing to club");
-        }
-      }
+      // Wait for transaction confirmation
+      const txReceipt = await txResponse.wait();
+
+      notification.success({
+        message: 'Transaction Successful',
+        description: (
+          <div>
+            Transaction Hash: <a href={`https://aeneid.storyscan.io/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
+          </div>
+        )
+      });
+
+      $('#aeAmount').val('');
+      $('.errorContributeClub').css('display','none');
+      $('.successContributeClub').css("display","block");
+      $('.successContributeClub').text("You have contributed to the club successfully");
+    } catch(e) {
+      console.error("Transaction error:", e);
+      toast.error(e.message || "Error contributing to club");
+      $('.successContributeClub').css('display','none');
+      $('.errorContributeClub').css("display","block");
+      $('.errorContributeClub').text(e.message || "Error contributing to club");
     }
   } catch(e) {
-    console.error(e);
+    console.error("General error:", e);
+    toast.error(e.message || "An unexpected error occurred");
     $('.successContributeClub').css('display','none');
     $('.errorContributeClub').css("display","block");
-    $('.errorContributeClub').text("Error: " + (e.message || "Unknown error"));
+    $('.errorContributeClub').text(e.message || "An unexpected error occurred");
   }
 }
 
@@ -155,7 +183,7 @@ async function leaveClub() {
                 message: 'Transaction Successful',
                 description: (
                   <div>
-                    Transaction Hash: <a href={`https://explorer.testnet.citrea.xyz/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
+                    Transaction Hash: <a href={`https://aeneid.storyscan.io/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
                   </div>
                 )
               });
@@ -207,7 +235,7 @@ function Club() {
   useEffect(() => {
     const checkConnection = async () => {
       try {
-        // Check if window.ethereum exists (Tomo SDK)
+        // Check if window.ethereum exists
         if (!window.ethereum) {
           setShowWalletModal(true);
           return;
@@ -220,6 +248,9 @@ function Club() {
           return;
         }
 
+        // Initialize contract
+        await getContract(walletAddress);
+
         // If both checks pass, proceed with normal flow
         const ans = localStorage.getItem("clubverification");
         const pod = localStorage.getItem("podsi");
@@ -229,8 +260,13 @@ function Club() {
         } else {  
           $('.clubveri').css("display","block");
         }
-        GetClub();
-        verifyUserInClub();
+        
+        // Load club data and verify user
+        await Promise.all([
+          GetClub(),
+          verifyUserInClub()
+        ]);
+
       } catch (error) {
         console.error("Connection check error:", error);
         setShowWalletModal(true);
@@ -238,7 +274,7 @@ function Club() {
     };
 
     checkConnection();
-  }, []);
+  }, []); // Empty dependency array since we only want this to run once on mount
 
   // getdealId();
 
@@ -294,7 +330,7 @@ function Club() {
                 message: 'Transaction Successful',
                 description: (
                   <div>
-                    Transaction Hash: <a href={`https://explorer.testnet.citrea.xyz/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
+                    Transaction Hash: <a href={`https://aeneid.storyscan.io/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
                   </div>
                 )
               });

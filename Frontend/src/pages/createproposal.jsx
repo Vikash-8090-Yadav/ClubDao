@@ -8,16 +8,12 @@ import ABI from "../SmartContract/artifacts/contracts/InvestmentClub.sol/Investm
 import { useNavigate } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import lighthouse from '@lighthouse-web3/sdk'
 import axios from 'axios';
 import { notification } from 'antd';
 import GetClub from "../getclub";
 const web3 = new Web3(new Web3.providers.HttpProvider("https://lightnode-json-rpc-story.grandvalleys.com"));
-const apiKey = "207e0c12.0ca654f5c03a4be18a3185ea63c31f81"
 var contractPublic = null;
-var cid = null;
 const ethers = require("ethers")
-
 
 const provider = new ethers.providers.Web3Provider(window.ethereum);
 async function getContract(userAddress) {
@@ -28,50 +24,15 @@ async function getContract(userAddress) {
   }
 }
 
-
-async function Registerjob(){
-
-  const formData = new FormData();
-  const requestReceivedTime = new Date()
-  
-  const endDate = requestReceivedTime.setMonth(requestReceivedTime.getMonth() + 1)
-  const replicationTarget = 2
-  const epochs = 4 // how many epochs before deal end should deal be renewed
-  formData.append('cid', cid)
-  formData.append('endDate', endDate)
-  formData.append('replicationTarget', replicationTarget)
-  formData.append('epochs', epochs)
-
-  const response = await axios.post(
-      `https://calibration.lighthouse.storage/api/register_job`,
-      formData
-  )
-  console.log(response.data)
-  toast.success('RAAS JOB Registered Sucessfully', {
-    position: "top-right",
-    autoClose: 15000,
-    hideProgressBar: false,
-    closeOnClick: true,
-    pauseOnHover: true,
-    draggable: true,
-    progress: undefined,
-    theme: "dark",
-    });
-}
 function CreateProposal() {
-
-
   const [Password, setPassword] = useState('');
   const [description, setDescription] = useState('');
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
   const [destination, setDestination] = useState('');
 
-  
   async function createProposal() {
-    
     var walletAddress = localStorage.getItem("filWalletAddress");
-    // alert(walletAddress) /// /////
     await getContract(walletAddress);
     if(contractPublic != null) {
       var proposal_description = $('#proposal_description').val();
@@ -100,7 +61,7 @@ function CreateProposal() {
       }
       var clubId = localStorage.getItem("clubId");
       const my_wallet = await web3.eth.accounts.wallet.load(password);
-      toast.info('Prposal Creation intiated ...', {
+      toast.info('Proposal Creation initiated ...', {
         position: "top-right",
         autoClose: 15000,
         hideProgressBar: false,
@@ -109,134 +70,59 @@ function CreateProposal() {
         draggable: true,
         progress: undefined,
         theme: "dark",
-        });
-      if(my_wallet !== undefined)
-      {
+      });
+      if(my_wallet !== undefined) {
         $('.loading_message_creating').css("display","block");
         proposal_amount = web3.utils.toWei(proposal_amount.toString(), 'ether');
 
-        toast.success("Proposal Uploaded to LightHouse")
-
-        const proposal = JSON.stringify({
-          clubId,proposal_amount, proposal_address, proposal_description,description
-
-        });
-        
-
-        const data = JSON.stringify({
-          proposal
-
-        });
-
-
-        const response = await lighthouse.uploadText(data, apiKey, proposal_description)
-
-        console.log("The cid is ",response.data.Hash);
-        const cid11 = response.data.Hash;
+        // Generate a random CID string
+        const randomCid = "Qm" + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
         var proposalId = localStorage.getItem("proposalId");
-        localStorage.setItem(proposalId-100,cid11);
+        localStorage.setItem(proposalId-100, randomCid);
 
-        cid = response.data.Hash;
+        if (web3 && web3.eth) {
+          try {
+            const abi = ABI.abi;
+            const iface = new ethers.utils.Interface(abi);
+            const encodedData = iface.encodeFunctionData("createProposal", [clubId, proposal_amount, proposal_address, proposal_description, randomCid]);
+            const GAS_MANAGER_POLICY_ID = "479c3127-fb07-4cc6-abce-d73a447d2c01";
         
-        
+            const signer = provider.getSigner();
+            console.log("signer", signer);
+            const tx = {
+              to: marketplaceAddress,
+              data: encodedData,
+            };
+            const txResponse = await signer.sendTransaction(tx);
+            const txReceipt = await txResponse.wait();
 
-        const query = contractPublic.methods.createProposal(clubId,proposal_amount, proposal_address, proposal_description,cid);
-        const encodedABI = query.encodeABI();
-        // const account1s = web3.eth.accounts;
-            //  alert("Yes");
-            // console.log(account1s)
-            // const transactionObject = {
-            //   from: my_wallet[0].address,
-            //   gasPrice: '20000000000',
-            //   gas: '2000000',
-            //   to: this.contractPublic.options.address,
-            //   data: encodedABI,
-            //   // value: amountAE
-            // };
-            // var signedTx;
-            // try {
-            //    signedTx = await this.web3.eth.accounts.signTransaction(
-            //     transactionObject,
-            //     my_wallet[0].privateKey
-            //   );
-            //   console.log(signedTx);
-            // } catch (error) {
-            //   console.error(error);
-            // }
-            if (web3 && web3.eth) {
-              try {
-                const abi = ABI.abi;
-                const iface = new ethers.utils.Interface(abi);
-                const encodedData = iface.encodeFunctionData("createProposal", [clubId,proposal_amount, proposal_address, proposal_description,cid]);
-                const GAS_MANAGER_POLICY_ID = "479c3127-fb07-4cc6-abce-d73a447d2c01";
-            
-                const signer = provider.getSigner();
-    
-                  console.log("singer",signer);
-                  const tx = {
-                    to: marketplaceAddress,
-                    data: encodedData,
-                  };
-                  const txResponse = await signer.sendTransaction(tx);
-                  const txReceipt = await txResponse.wait();
-    
-                  notification.success({
-                    message: 'Transaction Successful',
-                    description: (
-                      <div>
-                        Transaction Hash: <a href={`https://explorer.testnet.citrea.xyz/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
-                      </div>
-                    )
-                  });
-                  console.log(txReceipt.transactionHash);
-              } catch (error) {
-                toast.error(error)
-                $('#errorCreateProposal').css("display","block");
-                $('#errorCreateProposal').text(error);
-                return;
-            
-              }
-            } else {
-              console.error('web3 instance is not properly initialized.');
-            }
-  
-  
-  
-  
-  
-        
-        // const signedTx = await this.account1s.signTransaction(
-        //   {
-        //     from: my_wallet[0].address,
-        //   gasPrice: "20000000000",
-        //   gas: "2000000",
-        //   to: this.contractPublic.options.address,
-        //   data: encodedABI,
-        //     // value: amountAE
-        //   },
-        //   my_wallet[0].privateKey,
-        //   false
-        // );
-        // // var clubId = await this.web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-        // if (web3 && web3.eth) {
-        //   try {
-        //     const clubId = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-        //     console.log('Transaction Receipt:', clubId);
-        //   } catch (error) {
-        //     console.error('Error sending signed transaction:', error);
-        //   }
-        // } else {
-        //   console.error('web3 instance is not properly initialized.');
-        // }
+            notification.success({
+              message: 'Transaction Successful',
+              description: (
+                <div>
+                  Transaction Hash: <a href={`https://aeneid.storyscan.io/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
+                </div>
+              )
+            });
+            console.log(txReceipt.transactionHash);
+          } catch (error) {
+            toast.error(error)
+            $('#errorCreateProposal').css("display","block");
+            $('#errorCreateProposal').text(error);
+            return;
+          }
+        } else {
+          console.error('web3 instance is not properly initialized.');
+        }
+
         $('#proposal_description').val('');
         $('#proposal_address').val('');
         $('#proposal_amount').val('');
-
         $('#trx_password').val('');
         $('#errorCreateProposal').css("display","none");
         $('.loading_message_creating').css("display","none");
         $('#successCreateProposal').css("display","block");
-        toast.success('Prposal Creation Sucessfull ...', {
+        toast.success('Proposal Creation Successful ...', {
           position: "top-right",
           autoClose: 15000,
           hideProgressBar: false,
@@ -245,18 +131,16 @@ function CreateProposal() {
           draggable: true,
           progress: undefined,
           theme: "dark",
-          });
+        });
         $('#successCreateProposal').text("Proposal created successfully with description: " + proposal_description);
       } else {
         $('.valid-feedback').css('display','none');
         $('.loading_message_creating').css("display","none");
-          $('.invalid-feedback').css('display','block');
-          toast.error('The password is invalid')
-          $('.invalid-feedback').text('The password is invalid');
+        $('.invalid-feedback').css('display','block');
+        toast.error('The password is invalid')
+        $('.invalid-feedback').text('The password is invalid');
       }
-      
     }
-   
   }
 
   const navigate = useNavigate();

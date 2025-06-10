@@ -107,7 +107,7 @@ async function runProposal(event) {
                   message: 'Transaction Successful',
                   description: (
                     <div>
-                      Transaction Hash: <a href={`https://explorer.testnet.citrea.xyz/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
+                      Transaction Hash: <a href={`https://aeneid.storyscan.io/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
                     </div>
                   )
                 });
@@ -157,7 +157,7 @@ async function runProposal(event) {
               message: 'Transaction Successful',
               description: (
                 <div>
-                  Transaction Hash: <a href={`https://explorer.testnet.citrea.xyz/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
+                  Transaction Hash: <a href={`https://aeneid.storyscan.io/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
                 </div>
               )
             });
@@ -208,22 +208,20 @@ async function verify(){
   var proposalId = localStorage.getItem("proposalId");
   var clubs = await contractPublic.methods.getProposalsByClub(clubId).call();
   console.log(clubs)
-  const cid= clubs[proposalId-1].Cid;
+  const cid = clubs[proposalId-1].Cid;
 
-  const polygonScanlink = `https://gateway.lighthouse.storage/ipfs/${cid}`
-            toast.success(<a target="_blank" href={polygonScanlink}>Click to view Data</a>, {
-              position: "top-right",
-              autoClose: 18000,
-              hideProgressBar: false,
-              closeOnClick: true,
-              pauseOnHover: true,
-              draggable: true,
-              progress: undefined,
-              theme: "dark",
-              });
-        
-
+  toast.success(`Proposal CID: ${cid}`, {
+    position: "top-right",
+    autoClose: 18000,
+    hideProgressBar: false,
+    closeOnClick: true,
+    pauseOnHover: true,
+    draggable: true,
+    progress: undefined,
+    theme: "dark",
+  });
 }
+
 async function voteOnProposal() {
 
 
@@ -298,7 +296,7 @@ async function voteOnProposal() {
                 message: 'Transaction Successful',
                 description: (
                   <div>
-                    Transaction Hash: <a href={`https://explorer.testnet.citrea.xyz/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
+                    Transaction Hash: <a href={`https://aeneid.storyscan.io/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
                   </div>
                 )
               });
@@ -349,431 +347,288 @@ async function verifyUserInClub() {
 }
 
 function Proposal() {
-
   const navigate = useNavigate();
-  function Logout(){
+
+  useEffect(() => {
+    const initializeData = async () => {
+      try {
+        await Promise.all([
+          GetClub(),
+          verifyUserInClub(),
+          getProposalById()
+        ]);
+      } catch (error) {
+        console.error("Error initializing proposal data:", error);
+      }
+    };
+
+    initializeData();
+  }, []); 
+
+  function Logout() {
     web3.eth.accounts.wallet.clear();
     localStorage.clear();
     navigate('/login');
-  
   }
-
-
-    useEffect(() => {
-        {
-            GetClub();verifyUserInClub();getProposalById();
-        }
-      }, []);
-
-
 
   return (
     <div id="page-top">
-        <>
-  {/* Page Wrapper */}
-  <div id="wrapper">
-    {/* Sidebar */}
-    <ul
-      className="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion"
-      id="accordionSidebar"
-    >
-      {/* Sidebar - Brand */}
-      <a
-        className="sidebar-brand d-flex align-items-center justify-content-center"
-        href="/"
-      >
-        <div className="sidebar-brand-icon rotate-n-15">
-          <i className="fas fa-laugh-wink" />
+      <div id="wrapper">
+        {/* Sidebar */}
+        <ul className="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
+          {/* Sidebar - Brand */}
+          <a className="sidebar-brand d-flex align-items-center justify-content-center" href="/">
+            <div className="sidebar-brand-icon rotate-n-15">
+              <i className="fas fa-laugh-wink" />
+            </div>
+            <div className="sidebar-brand-text mx-3">Mantle Club</div>
+          </a>
+          <hr className="sidebar-divider my-0" />
+          <li className="nav-item active">
+            <a className="nav-link" href="/">
+              <i className="fas fa-fw fa-tachometer-alt" />
+              <span>Dashboard</span>
+            </a>
+          </li>
+          <li className="nav-item">
+            <Link className="nav-link" to="/joinclub">
+              <i className="fas fa-fw fa-users" />
+              <span>Available clubs</span>
+            </Link>
+          </li>
+          <li className="nav-item">
+            <Link className="nav-link" to="/createclub">
+              <i className="fas fa-fw fa-plus-circle" />
+              <span>Create club</span>
+            </Link>
+          </li>
+          <hr className="sidebar-divider d-none d-md-block" />
+          <div className="text-center d-none d-md-inline">
+            <button onClick={Tg} className="rounded-circle border-0" id="sidebarToggle" />
+          </div>
+        </ul>
+
+        {/* Content Wrapper */}
+        <div id="content-wrapper" className="d-flex flex-column">
+          {/* Main Content */}
+          <div id="content">
+            <div className="container-fluid">
+              {/* Page Heading */}
+              <div className="d-sm-flex align-items-center justify-content-between mb-4">
+                <h1 className="h3 mb-0 text-gray-800">
+                  <span className="club_name" />
+                </h1>
+              </div>
+
+              {/* Stats Cards */}
+              <div className="row">
+                <div className="col-xl-4 col-md-6 mb-4">
+                  <div className="card border-left-primary shadow h-100 py-2">
+                    <div className="card-body">
+                      <div className="row no-gutters align-items-center">
+                        <div className="col mr-2">
+                          <div className="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Club Balance (IP)
+                          </div>
+                          <div className="h5 mb-0 font-weight-bold text-gray-800 club_balance">-</div>
+                        </div>
+                        <div className="col-auto">
+                          <i className="fas fa-wallet fa-2x text-gray-300" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="col-xl-4 col-md-6 mb-4">
+                  <div className="card border-left-success shadow h-100 py-2">
+                    <div className="card-body">
+                      <div className="row no-gutters align-items-center">
+                        <div className="col mr-2">
+                          <div className="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            Proposals
+                          </div>
+                          <div className="h5 mb-0 font-weight-bold text-gray-800 club_proposals">-</div>
+                          <Link to="/createproposal" className="btn btn-success btn-sm mt-2">
+                            Create New
+                          </Link>
+                        </div>
+                        <div className="col-auto">
+                          <i className="fas fa-file-alt fa-2x text-gray-300" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="col-xl-4 col-md-6 mb-4">
+                  <div className="card border-left-info shadow h-100 py-2">
+                    <div className="card-body">
+                      <div className="row no-gutters align-items-center">
+                        <div className="col mr-2">
+                          <div className="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            All Proposals
+                          </div>
+                          <Link to="/club" className="btn btn-info btn-sm mt-2">
+                            View All
+                          </Link>
+                        </div>
+                        <div className="col-auto">
+                          <i className="fas fa-list fa-2x text-gray-300" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Proposal Details */}
+              <div className="row">
+                <div className="col-xl-8 col-lg-7">
+                  <div className="card shadow mb-4">
+                    <div className="card-header py-3">
+                      <h6 className="m-0 font-weight-bold text-primary">Proposal Details</h6>
+                    </div>
+                    <div className="card-body">
+                      <div className="row">
+                        <div className="col-md-12">
+                          <div className="form-group">
+                            <label className="font-weight-bold">Description:</label>
+                            <p className="proposal_description form-control-static">Loading...</p>
+                          </div>
+                          <div className="form-group">
+                            <label className="font-weight-bold">Creator:</label>
+                            <p id="proposal_creator" className="form-control-static">Loading...</p>
+                          </div>
+                          <div className="form-group">
+                            <label className="font-weight-bold">Destination:</label>
+                            <p id="proposal_destination" className="form-control-static">Loading...</p>
+                          </div>
+                          <div className="form-group">
+                            <label className="font-weight-bold">Amount (IP):</label>
+                            <p id="proposal_amount" className="form-control-static">Loading...</p>
+                          </div>
+                          <div className="form-group">
+                            <label className="font-weight-bold">Voting Period:</label>
+                            <p className="form-control-static">
+                              Starts: <span id="proposedAt">Loading...</span><br />
+                              Ends: <span id="proposalExpireAt">Loading...</span>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Voting Section */}
+                <div className="col-xl-4 col-lg-5">
+                  <div className="card shadow mb-4 leave_club" style={{ display: "none" }}>
+                    <div className="card-header py-3">
+                      <h6 className="m-0 font-weight-bold text-primary">
+                        Status: <span id="proposal_status" />
+                      </h6>
+                    </div>
+                    <div className="card-body">
+                      <div className="form-group">
+                        <label className="font-weight-bold">Votes:</label>
+                        <p>
+                          For: <span id="votes_for" className="text-success">0</span><br />
+                          Against: <span id="votes_against" className="text-danger">0</span>
+                        </p>
+                      </div>
+                      <div className="votes_available">
+                        <div className="form-group">
+                          <label className="font-weight-bold">Your Vote:</label>
+                          <select id="option_vote" className="form-control">
+                            <option value="1">Yes</option>
+                            <option value="0">No</option>
+                          </select>
+                        </div>
+                        <button onClick={voteOnProposal} className="btn btn-success btn-block">
+                          Submit Vote
+                        </button>
+                        <div className="successVote valid-feedback" style={{ display: "none" }} />
+                        <div className="errorVote invalid-feedback" style={{ display: "none" }} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Creator Options */}
+                  <div className="card shadow mb-4 creator_options" style={{ display: "none" }}>
+                    <div className="card-header py-3">
+                      <h6 className="m-0 font-weight-bold text-primary">Creator Options</h6>
+                    </div>
+                    <div className="card-body">
+                      <div className="form-group">
+                        <label className="font-weight-bold">Select Action:</label>
+                        <select id="option_execution" className="form-control">
+                          <option value="execute">Execute proposal</option>
+                          <option value="close">Close proposal</option>
+                        </select>
+                      </div>
+                      <button onClick={runProposal} className="btn btn-primary btn-block">
+                        Confirm Action
+                      </button>
+                      <div className="successExecution valid-feedback" style={{ display: "none" }} />
+                      <div className="errorExecution invalid-feedback" style={{ display: "none" }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <footer className="sticky-footer bg-white"></footer>
         </div>
-        <div className="sidebar-brand-text mx-3">CLUBDAO</div>
+      </div>
+
+      {/* Scroll to Top Button */}
+      <a className="scroll-to-top rounded" href="#page-top">
+        <i className="fas fa-angle-up" />
       </a>
-      {/* Divider */}
-      <hr className="sidebar-divider my-0" />
-      {/* Nav Item - Dashboard */}
-      <li className="nav-item active">
-        <a className="nav-link" href="/">
-          <i className="fas fa-fw fa-tachometer-alt" />
-          <span>Dashboard</span>
-        </a>
-      </li>
-      <li className="nav-item">
-        <Link  className=" nav-link" to="/joinclub">
-          <i className="fas fa-fw fa-file-image-o" />
-          <span>Available clubs</span>
-          </Link>
-        
-      </li>
-      <li className="nav-item">
-      <Link  className="nav-link" to="/createclub">
-          <i className="fas fa-fw fa-file-image-o" />
-          <span>Create club</span>
-        </Link>
-      </li>
-      {/* Divider */}
-      <hr className="sidebar-divider d-none d-md-block" />
-      {/* Sidebar Toggler (Sidebar) */}
-      <div className="text-center d-none d-md-inline">
-        <button  onClick={Tg} className="rounded-circle border-0" id="sidebarToggle" />
-      </div>
-    </ul>
-    {/* End of Sidebar */}
-    {/* Content Wrapper */}
-    <div id="content-wrapper" className="d-flex flex-column">
-      {/* Main Content */}
-      <div id="content">
-        {/* Topbar */}
-        
-        {/* End of Topbar */}
-        {/* Begin Page Content */}
-        <div className="container-fluid">
-          {/* Page Heading */}
-          <div className="d-sm-flex align-items-center justify-content-between mb-4">
-            <h1 className="h3 mb-0 text-gray-800">
-              <span className="club_name" />
-            </h1>
-          </div>
-          {/* Content Row */}
-          <div className="row">
-            {/* Earnings (Monthly) Card Example */}
-            <div className="col-xl-2 col-md-6 mb-4">
-              <div className="card border-left-primary shadow h-100 py-2">
-                <div className="card-body">
-                  <div className="row no-gutters align-items-center">
-                    <div className="col mr-2">
-                      <div className="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                        Club Balance (IP)
-                      </div>
-                      <div className="h5 mb-0 font-weight-bold text-gray-800 club_balance">
-                        -
-                      </div>
-                    </div>
-                    <div className="col-auto">
-                      <i className="fas fa-calendar fa-2x text-gray-300" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="col-xl-2 col-md-6 mb-4">
-              <div className="card border-left-primary shadow h-100 py-2">
-                <div className="card-body">
-                  <div className="row no-gutters align-items-center">
-                    <div className="col mr-2">
-                      <div className="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                        Proposals
-                      </div>
-                      <div className="h5 mb-0 font-weight-bold text-gray-800 club_proposals">
-                        -
-                      </div>
-                      <a
-                        href="/createproposal"
-                        className="btn btn-secondary btn-sm mt-2"
-                      >
-                        Create
-                      </a>
-                    </div>
-                    <div className="col-auto">
-                      <i className="fas fa-calendar fa-2x text-gray-300" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="col-xl-2 col-md-6 mb-4">
-              <div className="card border-left-primary shadow h-100 py-2">
-                <div className="card-body">
-                  <div className="row no-gutters align-items-center">
-                  <div className="col mr-2">
-                      <div className="text-xs font-weight-bold text-secondary text-uppercase mb-1">
-                        Proposals{" "}
-                      </div>
-                      <a className="btn btn-secondary" href="/club">
-                        See all proposals
-                      </a>
-                    </div>
-                    <div className="col-auto">
-                      <i className="fas fa-calendar fa-2x text-gray-300" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div> 
 
-            <div className="col-xl-3 nc col-md-6 mb-4">
-              <div className="card border-left-success shadow h-100 py-2">
-                <div className="card-body">
-                  <div className="row no-gutters align-items-center">
-                    <div className="col mr-2">
-                      <div className="text-xs font-weight-bold text-secondary text-uppercase mb-1">
-                        See All Data{" "}
-                      </div>
-                      
-                        <div className="btn btn-primary" onClick={verify}>
-                     
-                       Verify Dao Data
-                       </div>
-                    </div>
-                    <div className="col-auto">
-                      <i className="fas fa-clipboard-list fa-2x text-gray-300" />
-                    </div>
-                  </div>
-                </div>
-              </div>
+      {/* Modals */}
+      <div className="modal fade" id="seeAccountModal" tabIndex={-1} role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div className="modal-dialog" role="document">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title" id="exampleModalLabel">Account</h5>
+              <button className="close" type="button" data-dismiss="modal" aria-label="Close">
+                <span aria-hidden="true">×</span>
+              </button>
             </div>
+            <div className="modal-body">
+              <p className="font-weight-bold">Address:</p>
+              <div className="current_account" />
+              <p className="current_account_text" style={{ fontSize: "x-small" }} />
+            </div>
+          </div>
+        </div>
+      </div>
 
-          </div>
-          {/* Content Row */}
-          <div className="row">
-            {/* Area Chart */}
-            <div className="col-xl-8 col-lg-7">
-              <div className="card shadow mb-4">
-                {/* Card Header - Dropdown */}
-                <div className="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                  <h6 className="m-0 font-weight-bold text-primary">
-                    Proposal
-                  </h6>
-                </div>
-                {/* Card Body */}
-                <div className="card-body">
-                  <div className="row">
-                    <div className="col-md-12">
-                      Description:{" "}
-                      <b>
-                        <span className="proposal_description" />
-                      </b>{" "}
-                      <br />
-                      Creator:{" "}
-                      <b>
-                        <span id="proposal_creator" />
-                      </b>{" "}
-                      <br />
-                      Destination:{" "}
-                      <b>
-                        <span id="proposal_destination" />
-                      </b>{" "}
-                      <br />
-                      Amount (in IP):{" "}
-                      <b>
-                        <span id="proposal_amount" />
-                      </b>{" "}
-                      <br />
-                      CID of Document :{" "}
-                      <b>
-                        <span id="CID" />
-                      </b>{" "}
-                      <br />
-                      Voting perios Starts At:{""}
-                      <b>
-                        <span id="proposedAt" /> 
-                      </b>{""}
-                      <br />
-                      Voting Period Ends At:{""}
-                      <b>
-                        <span id="proposalExpireAt" />
-                      </b>{""}
-                      <br />
-                      Votes:  <br />
-                    </div>
-                  </div>
-                  <div className="row my_votes">
-                    <span className="loading_message">Loading...</span>
-                  </div>
-                </div>
-              </div>
+      <div className="modal fade" id="logoutModal" tabIndex={-1} role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div className="modal-dialog" role="document">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title" id="exampleModalLabel">Ready to Leave?</h5>
+              <button className="close" type="button" data-dismiss="modal" aria-label="Close">
+                <span aria-hidden="true">×</span>
+              </button>
             </div>
-            {/* Pie Chart */}
-            <div className="col-xl-4 col-lg-5">
-              <div
-                className="card shadow mb-4 leave_club"
-                style={{ display: "none" }}
-              >
-                <div className="card-header py-3">
-                  <h6 className="m-0 font-weight-bold text-primary">
-                    Status: <span id="proposal_status" />
-                  </h6>
-                </div>
-                <div className="card-body">
-                  <p>
-                    Votes for:{" "}
-                    <b>
-                      <span id="votes_for" />
-                    </b>{" "}
-                    <br />
-                    Votes against:{" "}
-                    <b>
-                      <span id="votes_against" />
-                    </b>{" "}
-                    <br />
-                  </p>
-                  <p className="votes_available">
-                    Option: <br />
-                    <select id="option_vote" className="form-control">
-                      <option value={1}>Yes</option>
-                      <option value={0}>No</option>
-                    </select>{" "}
-                    <br />
-                    
-                    <div 
-                     onClick={() => {
-                        voteOnProposal();
-                      }}id="btnVote" className="btn btn-success">
-                      Confirm
-                    </div>{" "}
-                    <br />
-                  </p>
-                  <div
-                    className="successVote valid-feedback"
-                    style={{ display: "none" }}
-                  />
-                  <div
-                    className="errorVote invalid-feedback"
-                    style={{ display: "none" }}
-                  />
-                  <p />
-                </div>
-              </div>
-              <div
-                className="card shadow mb-4 creator_options"
-                style={{ display: "none" }}
-              >
-                <div className="card-header py-3">
-                  <h6 className="m-0 font-weight-bold text-primary">Options</h6>
-                </div>
-                <div className="card-body">
-                  <p>
-                    Select an option: <br />
-                    <select id="option_execution" className="form-control">
-                      <option value="execute">Execute proposal</option>
-                      <option value="close">Close proposal</option>
-                    </select>{" "}
-                    <br />
-                   
-                    <div href="" id="btnExecution" onClick={() => {
-                        runProposal();
-                      }} className="btn btn-success">
-                      Confirm
-                    </div>{" "}
-                    <br />
-                  </p>
-                  <div
-                    className="successExecution valid-feedback"
-                    style={{ display: "none" }}
-                  />
-                  <div
-                    className="errorExecution invalid-feedback"
-                    style={{ display: "none" }}
-                  />
-                  <p />
-                </div>
-              </div>
+            <div className="modal-body">
+              Select "Logout" below if you are ready to end your current session.
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" type="button" data-dismiss="modal">Cancel</button>
+              <button className="btn btn-primary" onClick={Logout}>Logout</button>
             </div>
           </div>
-          {/* Content Row */}
-          <div className="row">
-            <div className="col-lg-6 mb-4"></div>
-          </div>
-        </div>
-        {/* /.container-fluid */}
-      </div>
-      {/* End of Main Content */}
-      {/* Footer */}
-      <footer className="sticky-footer bg-white"></footer>
-      {/* End of Footer */}
-    </div>
-    {/* End of Content Wrapper */}
-  </div>
-  {/* End of Page Wrapper */}
-  {/* Scroll to Top Button*/}
-  <a className="scroll-to-top rounded" href="#page-top">
-    <i className="fas fa-angle-up" />
-  </a>
-  {/* Logout Modal*/}
-  <div
-    className="modal fade"
-    id="seeAccountModal"
-    tabIndex={-1}
-    role="dialog"
-    aria-labelledby="exampleModalLabel"
-    aria-hidden="true"
-  >
-    <div className="modal-dialog" role="document">
-      <div className="modal-content">
-        <div className="modal-header">
-          <h5 className="modal-title" id="exampleModalLabel">
-            Account
-          </h5>
-          <button
-            className="close"
-            type="button"
-            data-dismiss="modal"
-            aria-label="Close"
-          >
-            <span aria-hidden="true">×</span>
-          </button>
-        </div>
-        <div className="modal-body">
-          Address: <br /> <div className="current_account" />
-          <br />
-          <span
-            style={{ fontSize: "x-small" }}
-            className="current_account_text"
-          />
-        </div>
-        <div className="modal-footer"></div>
-      </div>
-    </div>
-  </div>
-  {/* Logout Modal*/}
-  <div
-    className="modal fade"
-    id="logoutModal"
-    tabIndex={-1}
-    role="dialog"
-    aria-labelledby="exampleModalLabel"
-    aria-hidden="true"
-  >
-    <div className="modal-dialog" role="document">
-      <div className="modal-content">
-        <div className="modal-header">
-          <h5 className="modal-title" id="exampleModalLabel">
-            Ready to Leave?
-          </h5>
-          <button
-            className="close"
-            type="button"
-            data-dismiss="modal"
-            aria-label="Close"
-          >
-            <span aria-hidden="true">×</span>
-          </button>
-        </div>
-        <div className="modal-body">
-          Select "Logout" below if you are ready to end your current session in
-          this browser.
-        </div>
-        <div className="modal-footer">
-          <button
-            className="btn btn-secondary"
-            type="button"
-            data-dismiss="modal"
-          >
-            Cancel
-          </button>
-          <div className="btn btn-primary" onClick={Logout} id="btnLogout">
-            Logout
-          </div>
         </div>
       </div>
     </div>
-  </div>
-</>
-
-    </div>
-  )
+  );
 }
 
-// getClub();
-//             verifyUserInClub();
-//             getProposalById();
-
-export default Proposal
+export default Proposal;
