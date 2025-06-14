@@ -15,7 +15,7 @@ const WalletConnectModal = ({ isOpen, onClose }) => {
             <i className="fas fa-wallet"></i>
           </div>
           <h2>Wallet Connection Required</h2>
-          <p>Please install and connect Tomo SDK to continue using ClubDAO</p>
+          <p>Please connect your MetaMask wallet to continue using ClubDAO</p>
           <div className="wallet-modal-buttons">
             <button className="wallet-modal-button connect" onClick={() => navigate('/login')}>
               Connect Wallet
@@ -27,7 +27,7 @@ const WalletConnectModal = ({ isOpen, onClose }) => {
           <div className="wallet-modal-footer">
             <p className="wallet-modal-note">
               <i className="fas fa-info-circle"></i>
-              Note: You need to have Tomo SDK installed in your browser
+              Note: You need to have MetaMask installed in your browser
             </p>
           </div>
         </div>

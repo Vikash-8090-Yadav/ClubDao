@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Link,Navigate } from "react-router-dom";
 import { useNavigate } from 'react-router-dom';
+import { useAccount } from 'wagmi';
 
 import GetMyClubs from "../getMyClubs";
 import Tg from "./toggle";
@@ -12,63 +13,40 @@ import $, { error } from 'jquery';
 import { marketplaceAddress } from "../config";
 import {Web3} from 'web3';
 
+// Initialize Web3 with Tomo provider
 const web3 = new Web3(new Web3.providers.HttpProvider("https://lightnode-json-rpc-story.grandvalleys.com"));
 var contractPublic = null;
 
-async function checkBalance() {
-  
+async function checkBalance(address) {
   try {
-    const myWallet = localStorage.getItem("filWalletAddress");
-    if (!myWallet) {
-      // Handle the case where the wallet address is not available in localStorage
+    if (!address) {
       return;
     }
     
-    // Assuming you've properly initialized the web3 instance before this point
-    const balanceWei = await web3.eth.getBalance(myWallet);
-    
-    // Convert Wei to Ether (assuming Ethereum)
+    const balanceWei = await web3.eth.getBalance(address);
     const balanceEther = web3.utils.fromWei(balanceWei, "ether");
-    
-    // Update the balance on the page
     $('.view_balance_address').text(balanceEther);
   } catch (error) {
     console.error("Error:", error);
   }
 }
+
 function Base() {
   const [password, setPassword] = useState('');
-  
   const navigate = useNavigate();
-  function Logout(){
-    web3.eth.accounts.wallet.clear();
+  const { address, isConnected } = useAccount();
+
+  function Logout() {
     localStorage.clear();
-  
+    navigate('/login');
   }
 
-  
-
-
-  
-  
-
   useEffect(() => {
-    {
-      
-      
-      if(localStorage.getItem('filWalletAddress') != null) {
-        checkBalance();
-        //checkCurrentBlock();
-        const myWallet = localStorage.getItem("filWalletAddress")
-        $('.current_account_text').text(myWallet);
-      }
-
-      GetMyClubs(); // Call the imported function here
+    if (isConnected && address) {
+      checkBalance(address);
+      $('.current_account_text').text(address);
     }
-  }, []);
-  var isAuthenticated = localStorage.getItem('filWalletAddress');
-
-
+  }, [isConnected, address]);
 
   return (
     <div id="page-top">
@@ -209,9 +187,19 @@ function Base() {
                 </div>
                 
                 {/* Card Body */}
-                <div className="card-body my_clubs">
-                  <span className="loading_message">Loading...</span>
-
+                <div className="card-body">
+                  <div className="my_clubs">
+                    {isConnected ? (
+                      <div>
+                        <GetMyClubs />
+                      </div>
+                    ) : (
+                      <div className="wallet-message">
+                        <h3>Please connect your wallet to view your clubs</h3>
+                        <p>Current wallet status: Not Connected</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="mmn">

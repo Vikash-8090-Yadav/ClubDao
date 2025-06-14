@@ -1,104 +1,197 @@
-
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
-
-import club from "./pages/club";
+import { useState, useEffect } from "react";
 import { marketplaceAddress } from "./config";
 import {Web3} from 'web3';
 import $ from 'jquery'; 
 import ABI from "./SmartContract/artifacts/contracts/InvestmentClub.sol/InvestmentClub.json"
+import { TomoEVMKitProvider, useConnectModal, useAccountModal } from '@tomo-inc/tomo-evm-kit';
+import { useAccount, usePublicClient, useWalletClient, useChainId } from 'wagmi';
+import { parseEther } from 'viem';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+const ethers = require("ethers");
 
 const web3 = new Web3(new Web3.providers.HttpProvider("https://lightnode-json-rpc-story.grandvalleys.com"));
-var contractPublic = null;
+const provider = new ethers.providers.Web3Provider(window.ethereum);
+let contractPublic = null;
 
-
-
-  async function getContract(userAddress) {
-    contractPublic = await new web3.eth.Contract(ABI.abi,marketplaceAddress);
-    console.log(contractPublic)
+async function getContract(userAddress) {
+  try {
+    contractPublic = new web3.eth.Contract(ABI.abi, marketplaceAddress);
+    console.log("Contract initialized:", contractPublic);
     if(userAddress != null && userAddress != undefined) {
       contractPublic.defaultAccount = userAddress;
     }
-  }
-
-async function GetMyClubs() {
-
-  function changeClub(clubId){
-    localStorage.setItem('clubId', clubId);
-    window.location.href = '/club';
-
-  }
-
-
-  var walletAddress = localStorage.getItem("filWalletAddress");
-  await getContract(walletAddress);
-  if(contractPublic != undefined) {
-    var clubs = await contractPublic.methods.getMyClubs().call()
-    console.log(clubs)
-    if(clubs.length > 0) {
-
-      var list = document.querySelector('.my_clubs');
-        var table = document.createElement('table');
-        var thead = document.createElement('thead');
-        var tbody = document.createElement('tbody');
-
-        var theadTr = document.createElement('tr');
-        var balanceHeader = document.createElement('th');
-        balanceHeader.innerHTML = 'ID';
-        theadTr.appendChild(balanceHeader);
-        var contractNameHeader = document.createElement('th');
-        contractNameHeader.innerHTML = 'Name';
-        theadTr.appendChild(contractNameHeader);
-        var contractTickerHeader = document.createElement('th');
-        contractTickerHeader.innerHTML = 'Members';
-        theadTr.appendChild(contractTickerHeader);
-        
-        var usdHeader = document.createElement('th');
-        usdHeader.innerHTML = 'Proposals';
-        theadTr.appendChild(usdHeader);
-        
-        
-        thead.appendChild(theadTr)
-
-        table.className = 'table';
-        table.appendChild(thead);
-        clubs.forEach((valor) => {
-         
-          if(valor.clubId != 0) {
-            var tbodyTr = document.createElement('tr');
-        var contractTd = document.createElement('td');
-        var clubLink = document.createElement('a');
-    clubLink.className = 'btn btn-success';
-    clubLink.textContent = valor.clubId;
-    clubLink.addEventListener('click', function() {
-      changeClub(valor.clubId);
-    });
-    // var clubItem = document.createElement('div');
-
-        // contractTd.innerHTML = "<a class='btn btn-success' onclick='changeClub(" + valor.clubId + ")'>"+valor.clubId+"</a>";
-        tbodyTr.appendChild(clubLink);
-        var contractTickerTd = document.createElement('td');
-        contractTickerTd.innerHTML = '<b>' + valor.name + '</b>';
-        tbodyTr.appendChild(contractTickerTd);
-        var balanceTd = document.createElement('td');
-        balanceTd.innerHTML = '<b>' + valor.memberCount + '</b>';
-        tbodyTr.appendChild(balanceTd);
-        var balanceUSDTd = document.createElement('td');
-        balanceUSDTd.innerHTML = '<b>' + valor.proposalCount+ '</b>';
-        tbodyTr.appendChild(balanceUSDTd);
-
-        
-
-        tbody.appendChild(tbodyTr);
-          }
-        
-      });
-
-      table.appendChild(tbody);
-
-        list.appendChild(table);
-    }
-    $('.loading_message').css('display','none');
+    return true;
+  } catch (error) {
+    console.error("Error initializing contract:", error);
+    return false;
   }
 }
 
-  export default GetMyClubs;
+function GetMyClubsContent() {
+  const { address, isConnected } = useAccount();
+  const { openConnectModal } = useConnectModal();
+  const { openAccountModal } = useAccountModal();
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
+  const chainId = useChainId();
+  const [clubs, setClubs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchClubs() {
+      try {
+        if (!isConnected || !address) {
+          console.log("Wallet not connected or no address available");
+          setLoading(false);
+          return;
+        }
+
+        console.log("Fetching clubs for address:", address);
+        const contractInitialized = await getContract(address);
+        
+        if (!contractInitialized) {
+          throw new Error("Failed to initialize contract");
+        }
+
+        if (contractPublic) {
+          const fetchedClubs = await contractPublic.methods.getMyClubs().call();
+          console.log("Raw fetched clubs:", fetchedClubs);
+          
+          if (fetchedClubs && fetchedClubs.length > 0) {
+            const processedClubs = fetchedClubs
+              .filter(club => club.clubId != 0)
+              .map(club => {
+                console.log("Processing club:", club);
+                return {
+                  clubId: club.clubId,
+                  name: club.name,
+                  memberCount: club.memberCount || '0',
+                  proposalCount: club.proposalCount || '0'
+                };
+              });
+            console.log("Processed clubs:", processedClubs);
+            setClubs(processedClubs);
+          } else {
+            console.log("No clubs found for address:", address);
+            setClubs([]);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching clubs:", error);
+        toast.error("Error fetching clubs: " + error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchClubs();
+  }, [address, isConnected]);
+
+  function changeClub(clubId) {
+    localStorage.setItem('clubId', clubId);
+    window.location.href = '/club';
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="text-center p-4">
+        <h3>Please connect your wallet to view your clubs</h3>
+        <button 
+          className="btn btn-primary mt-3"
+          onClick={openConnectModal}
+        >
+          Connect Wallet
+        </button>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return <div className="loading_message">Loading...</div>;
+  }
+
+  if (clubs.length === 0) {
+    return (
+      <div className="text-center p-4">
+        <h3>No clubs found</h3>
+        <p>You haven't joined any clubs yet.</p>
+        <Link to="/joinclub" className="btn btn-primary mt-3">
+          Join a Club
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="my_clubs">
+      <table className="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Members</th>
+            <th>Proposals</th>
+          </tr>
+        </thead>
+        <tbody>
+          {clubs.map((club) => (
+            <tr key={club.clubId}>
+              <td>
+                <button 
+                  className="btn btn-success"
+                  style={{
+                    padding: '12px 24px',
+                    fontSize: '16px',
+                    minWidth: '120px',
+                    fontWeight: 'bold',
+                    borderRadius: '8px',
+                    border: '2px solid #28a745',
+                    backgroundColor: '#f8f9fa',
+                    color: '#28a745',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => changeClub(club.clubId)}
+                >
+                  {String(club.clubId)}
+                </button>
+              </td>
+              <td><b>{club.name}</b></td>
+              <td><b>{String(club.memberCount)}</b></td>
+              <td><b>{String(club.proposalCount)}</b></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark"
+      />
+    </div>
+  );
+}
+
+// Wrap the component with TomoEVMKitProvider
+function GetMyClubs() {
+  return (
+    <TomoEVMKitProvider>
+      <GetMyClubsContent />
+    </TomoEVMKitProvider>
+  );
+}
+
+export default GetMyClubs;

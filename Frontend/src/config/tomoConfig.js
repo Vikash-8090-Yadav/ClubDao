@@ -18,6 +18,14 @@ const config = getDefaultConfig({
     },
   ],
   ssr: true,
+  // Add transport configuration for better performance
+  transport: {
+    http: {
+      timeout: 30000,
+    },
+  },
+  // Add polling configuration
+  pollingInterval: 4000,
 });
 
 export default config; 

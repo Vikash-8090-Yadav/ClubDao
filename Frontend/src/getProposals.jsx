@@ -3,22 +3,23 @@ import { marketplaceAddress } from './config';
 import { Web3 } from 'web3';
 import $ from 'jquery';
 import ABI from "./SmartContract/artifacts/contracts/InvestmentClub.sol/InvestmentClub.json";
+import { useAccount } from 'wagmi';
 
-// Initialize Web3 with window.ethereum for MetaMask
-const web3 = new Web3(window.ethereum);
+// Initialize Web3 with HTTP provider
+const web3 = new Web3(new Web3.providers.HttpProvider("https://lightnode-json-rpc-story.grandvalleys.com"));
 
 const GetProposals = () => {
-  const [contractPublic, setContractPublic] = useState(null);
-  const [retryCount, setRetryCount] = useState(0);
-  const MAX_RETRIES = 3;
+  const [proposals, setProposals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { address } = useAccount();
 
-  const getContract = async (userAddress) => {
+  const getContract = async () => {
     try {
       const contract = new web3.eth.Contract(ABI.abi, marketplaceAddress);
-      if(userAddress != null && userAddress != undefined) {
-        contract.defaultAccount = userAddress;
+      if(address) {
+        contract.defaultAccount = address;
       }
-      setContractPublic(contract);
       return contract;
     } catch (error) {
       console.error("Error initializing contract:", error);
@@ -34,12 +35,11 @@ const GetProposals = () => {
   useEffect(() => {
     const loadProposals = async () => {
       try {
-        const walletAddress = localStorage.getItem("filWalletAddress");
-        if (!walletAddress) {
+        if (!address) {
           throw new Error("Wallet not connected");
         }
 
-        const contract = await getContract(walletAddress);
+        const contract = await getContract();
         
         const clubId = localStorage.getItem("clubId");
         if (!clubId) {
@@ -51,92 +51,63 @@ const GetProposals = () => {
         console.log("Proposals fetched:", clubs);
         
         if (clubs && clubs.length > 0) {
-          const list = document.querySelector('.available_proposals');
-          if (!list) {
-            console.error("Could not find .available_proposals element");
-            return;
-          }
-
-          // Clear existing content
-          list.innerHTML = '';
-          
-          const table = document.createElement('table');
-          const thead = document.createElement('thead');
-          const tbody = document.createElement('tbody');
-
-          const theadTr = document.createElement('tr');
-          const headers = ['ID', 'Description', 'Amount ( IP )', 'Proposal Status'];
-          
-          headers.forEach(headerText => {
-            const th = document.createElement('th');
-            th.innerHTML = headerText;
-            theadTr.appendChild(th);
-          });
-
-          thead.appendChild(theadTr);
-          table.className = 'table';
-          table.appendChild(thead);
-
-          clubs.forEach((valor) => {
-            const tbodyTr = document.createElement('tr');
-            
-            // ID column with link
-            const idCell = document.createElement('td');
-            const clubLink = document.createElement('a');
-            clubLink.className = 'btn btn-success';
-            clubLink.textContent = valor.id;
-            clubLink.addEventListener('click', () => changeProposal(valor.id));
-            idCell.appendChild(clubLink);
-            tbodyTr.appendChild(idCell);
-
-            // Description column
-            const descCell = document.createElement('td');
-            descCell.innerHTML = '<b>' + valor.description + '</b>';
-            tbodyTr.appendChild(descCell);
-
-            // Amount column
-            const amountCell = document.createElement('td');
-            amountCell.innerHTML = '<b>' + web3.utils.fromWei(valor.amount.toString(), 'ether') + '</b>';
-            tbodyTr.appendChild(amountCell);
-
-            // Status column
-            const statusCell = document.createElement('td');
-            statusCell.innerHTML = '<b>' + valor.status + '</b>';
-            tbodyTr.appendChild(statusCell);
-
-            tbody.appendChild(tbodyTr);
-          });
-
-          table.appendChild(tbody);
-          list.appendChild(table);
+          setProposals(clubs);
         } else {
-          const list = document.querySelector('.available_proposals');
-          if (list) {
-            list.innerHTML = '<div class="alert alert-info">No proposals found for this club.</div>';
-          }
+          setProposals([]);
         }
         
-        $('.loading_message').css('display', 'none');
+        setLoading(false);
       } catch (error) {
         console.error("Error loading proposals:", error);
-        const list = document.querySelector('.available_proposals');
-        if (list) {
-          list.innerHTML = '<div class="alert alert-danger">Error loading proposals. Please try again.</div>';
-        }
-        
-        // Retry logic
-        if (retryCount < MAX_RETRIES) {
-          console.log(`Retrying proposal load (${retryCount + 1}/${MAX_RETRIES})...`);
-          setRetryCount(prev => prev + 1);
-          setTimeout(loadProposals, 5000); // Retry after 5 seconds
-        }
+        setError(error.message);
+        setLoading(false);
       }
     };
 
     loadProposals();
-  }, [retryCount]);
+  }, [address]);
 
-  return null;
+  if (loading) {
+    return <div className="loading_message">Loading...</div>;
+  }
+
+  if (error) {
+    return <div className="alert alert-danger">Error loading proposals: {error}</div>;
+  }
+
+  if (proposals.length === 0) {
+    return <div className="alert alert-info">No proposals found for this club.</div>;
+  }
+
+  return (
+    <table className="table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Description</th>
+          <th>Amount (IP)</th>
+          <th>Proposal Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {proposals.map((proposal) => (
+          <tr key={proposal.id}>
+            <td>
+              <button 
+                className="btn btn-success"
+                onClick={() => changeProposal(proposal.id)}
+              >
+                {proposal.id}
+              </button>
+            </td>
+            <td><b>{proposal.description}</b></td>
+            <td><b>{web3.utils.fromWei(proposal.amount.toString(), 'ether')}</b></td>
+            <td><b>{proposal.status}</b></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
 };
 
 export default GetProposals; 
