@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import { marketplaceAddress } from "../config";
-import {Web3} from 'web3';
+import { TomoEVMKitProvider, useConnectModal, useAccountModal } from '@tomo-inc/tomo-evm-kit';
+import { useAccount, useSignMessage, useSignTypedData, usePublicClient, useWalletClient, useChainId } from 'wagmi';
+import Web3 from 'web3';
 import $, { error } from 'jquery'; 
 import { useNavigate } from 'react-router-dom';
 import ABI from "../SmartContract/artifacts/contracts/InvestmentClub.sol/InvestmentClub.json"
@@ -15,347 +17,346 @@ import axios from 'axios';
 import Tg from "../components/toggle";
 const ethers = require("ethers")
 
-// Initialize Web3 with window.ethereum for MetaMask
+// Initialize Web3 with TomoEVMKit
 const web3 = new Web3(window.ethereum);
 var contractPublic = null;
 
 var hash = null;
 async function getContract(userAddress) {
   try {
+    console.log("Initializing contract with address:", marketplaceAddress);
     contractPublic = new web3.eth.Contract(ABI.abi, marketplaceAddress);
+    console.log("Contract initialized successfully");
+    
     if(userAddress != null && userAddress != undefined) {
+      console.log("Setting contract account to:", userAddress);
       contractPublic.defaultAccount = userAddress;
     }
-    return contractPublic;
+    return true;
   } catch (error) {
     console.error("Error initializing contract:", error);
-    throw error;
+    return false;
   }
 }
 
 const provider = new ethers.providers.Web3Provider(window.ethereum);
 
-async function contributeClub() {
-  try {
-    toast.info('Contribution initiated ...', {
-      position: "top-right",
-      autoClose: 15000,
-      hideProgressBar: false,
-      closeOnClick: true,
-      pauseOnHover: true,
-      draggable: true,
-      progress: undefined,
-      theme: "dark",
-    });
+function Club() {
+  const navigate = useNavigate();
+  const { address, isConnected } = useAccount();
+  const { openConnectModal } = useConnectModal();
+  const { openAccountModal } = useAccountModal();
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
+  const chainId = useChainId();
+  const [password, setPassword] = useState('');
+  const [clubData, setClubData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-    const walletAddress = localStorage.getItem("filWalletAddress");
-    if (!walletAddress) {
-      throw new Error("Wallet not connected");
-    }
-
-    await getContract(walletAddress);
-    
-    $('.successContributeClub').css('display','none');
-    $('.errorContributeClub').css('display','none');
-    
-    const clubId = localStorage.getItem("clubId");
-    const amountAE = $('#aeAmount').val();
-
-    if(!amountAE || amountAE <= 0) {
-      throw new Error("Amount must be more than 0");
-    }
-
-    if(!clubId) {
-      throw new Error("Club ID not found");
-    }
-
-    if(!contractPublic) {
-      throw new Error("Contract not initialized");
-    }
-
-    $('.successContributeClub').css("display","block");
-    $('.successContributeClub').text("Contributing to the club...");
-    
-    // Convert amount to Wei
-    const amountInWei = web3.utils.toWei(amountAE.toString(), 'ether');
-    
+  const fetchClubData = async () => {
     try {
-      // Get the signer from the provider
-      const signer = provider.getSigner();
-      
-      // Create the transaction
-      const tx = {
-        to: marketplaceAddress,
-        data: contractPublic.methods.contributeToClub(clubId).encodeABI(),
-        value: amountInWei,
-        gasLimit: 300000,
-      };
+      const clubId = localStorage.getItem("clubId");
+      if (!clubId) {
+        setLoading(false);
+        return;
+      }
 
-      // Show transaction pending notification
-      toast.info('Transaction pending...', {
-        position: "top-right",
-        autoClose: false,
-        closeOnClick: false,
+      const club = await publicClient.readContract({
+        address: marketplaceAddress,
+        abi: ABI.abi,
+        functionName: 'getClubById',
+        args: [clubId],
       });
 
-      // Send transaction
-      const txResponse = await signer.sendTransaction(tx);
-      
-      // Show transaction hash notification
-      toast.info(`Transaction sent! Hash: ${txResponse.hash}`, {
-        position: "top-right",
-        autoClose: 10000,
-      });
-
-      // Wait for transaction confirmation
-      const txReceipt = await txResponse.wait();
-
-      notification.success({
-        message: 'Transaction Successful',
-        description: (
-          <div>
-            Transaction Hash: <a href={`https://aeneid.storyscan.io/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
-          </div>
-        )
-      });
-
-      $('#aeAmount').val('');
-      $('.errorContributeClub').css('display','none');
-      $('.successContributeClub').css("display","block");
-      $('.successContributeClub').text("You have contributed to the club successfully");
-    } catch(e) {
-      console.error("Transaction error:", e);
-      toast.error(e.message || "Error contributing to club");
-      $('.successContributeClub').css('display','none');
-      $('.errorContributeClub').css("display","block");
-      $('.errorContributeClub').text(e.message || "Error contributing to club");
-    }
-  } catch(e) {
-    console.error("General error:", e);
-    toast.error(e.message || "An unexpected error occurred");
-    $('.successContributeClub').css('display','none');
-    $('.errorContributeClub').css("display","block");
-    $('.errorContributeClub').text(e.message || "An unexpected error occurred");
-  }
-}
-
-async function leaveClub() {
-  $('.successJoinLeaveClub').css('display','none');
-  $('.errorJoinLeaveClub').css('display','none');
-  var clubId = localStorage.getItem("clubId");
-  var password = $('#passwordShowPVLeave').val();
-  if(password == '') {
-    $('.successJoinLeaveClub').css('display','none');
-    $('.errorJoinLeaveClub').css("display","block");
-    $('.errorJoinLeaveClub').text("Password is invalid");
-    return;
-  }
-  const my_wallet = await web3.eth.accounts.wallet.load(password);
-  if(my_wallet !== undefined)
-  {
-    
-    if(clubId != null) {
-      $('.successJoinLeaveClub').css("display","block");
-      $('.successJoinLeaveClub').text("Leaving the club...");
-      await getContract();
-      if(contractPublic != undefined) {
+      if (club) {
+        setClubData(club);
         
-        const query = contractPublic.methods.leaveClub(clubId);
-        const encodedABI = query.encodeABI();
+        // Update UI with club data
+        if (club.name) {
+          $('.club_name').text(club.name);
+        }
 
-        try{
-          const abi = ABI.abi;
-            const iface = new ethers.utils.Interface(abi);
-            const encodedData = iface.encodeFunctionData("leaveClub", [clubId]);
-            const GAS_MANAGER_POLICY_ID = "479c3127-fb07-4cc6-abce-d73a447d2c01";
-        
-            const signer = provider.getSigner();
+        if (club.clubId) {
+          $('#club_id').text(club.clubId);
+        }
 
-              console.log("singer",signer);
-              const tx = {
-                to: marketplaceAddress,
-                data: encodedData,
-              };
-              const txResponse = await signer.sendTransaction(tx);
-              const txReceipt = await txResponse.wait();
+        if (club.memberCount !== undefined) {
+          const memberCount = club.memberCount.toString();
+          $('.club_members').text(memberCount);
+        }
 
-              notification.success({
-                message: 'Transaction Successful',
-                description: (
-                  <div>
-                    Transaction Hash: <a href={`https://aeneid.storyscan.io/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
-                  </div>
-                )
-              });
+        if (club.proposalCount !== undefined) {
+          const proposalCount = club.proposalCount.toString();
+          $('.club_proposals').text(proposalCount);
+        }
 
-              console.log(txReceipt.transactionHash);
-          }catch(error){
-            console.log(error)
-          }
-
+        if (club.pool !== undefined) {
+          const poolBalanceWei = club.pool.toString();
+          const poolBalanceEther = web3.utils.fromWei(poolBalanceWei, 'ether');
+          $('.club_balance').text(poolBalanceEther);
         }
       }
-    $('.errorJoinLeaveClub').css('display','none');
-    $('.successJoinLeaveClub').css("display","block");
-    $('.successJoinLeaveClub').text("You have left the club successfully");
-  } else {
-    $('.successJoinLeaveClub').css('display','none');
-    $('.errorJoinLeaveClub').css("display","block");
-    $('.errorJoinLeaveClub').text("Password is invalid");
-    return;
-  }
-}
-
-
-
-async function verifyUserInClub() {
-  var clubId = localStorage.getItem("clubId");
-  var filWalletAddress = localStorage.getItem("filWalletAddress");
-  if(clubId != null) {
-    await getContract();
-    if(contractPublic != undefined) {
-      var user = await contractPublic.methods.isMemberOfClub(filWalletAddress,clubId).call();
-      if(user) {
-        $('.join_club').css('display','none');
-        $('.leave_club').css('display','block');
-      } else {
-        $('.join_club').css('display','block');
-        $('.leave_club').css('display','none');
-      }
+    } catch (error) {
+      console.error("Error in fetchClubData:", error);
+    } finally {
+      setLoading(false);
     }
-  }
-}
-
-
-
-function Club() {
-  const [showWalletModal, setShowWalletModal] = useState(false);
-  const navigate = useNavigate();
+  };
 
   useEffect(() => {
     const checkConnection = async () => {
       try {
-        // Check if window.ethereum exists
-        if (!window.ethereum) {
-          setShowWalletModal(true);
+        // Check if user is authenticated via Google
+        const isGoogleAuth = localStorage.getItem("authenticated") === "true";
+
+        // If user is authenticated via Google, proceed without wallet check
+        if (isGoogleAuth) {
+          const ans = localStorage.getItem("clubverification");
+          const pod = localStorage.getItem("podsi");
+          if (ans === "a") {
+            $('.clubveri').hide();
+            $('.clwr').text('Verification Completed-' + pod);
+          } else {
+            $('.clubveri').show();
+          }
+          
+          // Load club data and verify user
+          await Promise.all([
+            fetchClubData(),
+            verifyUserInClub()
+          ]);
           return;
         }
 
-        // Check if wallet is connected
-        const walletAddress = localStorage.getItem("filWalletAddress");
-        if (!walletAddress) {
-          setShowWalletModal(true);
+        // If not authenticated via Google, check wallet connection
+        if (!isConnected) {
           return;
         }
 
-        // Initialize contract
-        await getContract(walletAddress);
+        // Initialize contract with connected wallet address
+        await getContract(address);
 
         // If both checks pass, proceed with normal flow
         const ans = localStorage.getItem("clubverification");
         const pod = localStorage.getItem("podsi");
-        if(ans == "a"){
-          $('.clubveri').css("display","none");
-          $('.clwr').text('Verification Completed-'+pod);
-        } else {  
-          $('.clubveri').css("display","block");
+        if (ans === "a") {
+          $('.clubveri').hide();
+          $('.clwr').text('Verification Completed-' + pod);
+        } else {
+          $('.clubveri').show();
         }
         
         // Load club data and verify user
         await Promise.all([
-          GetClub(),
+          fetchClubData(),
           verifyUserInClub()
         ]);
 
       } catch (error) {
         console.error("Connection check error:", error);
-        setShowWalletModal(true);
       }
     };
 
     checkConnection();
-  }, []); // Empty dependency array since we only want this to run once on mount
+  }, [isConnected, address]);
 
-  // getdealId();
-
-  
-  const [password, setPassword] = useState('');
-
-
-  async function joinClub() {
-    $('.successJoinLeaveClub').css('display','none');
-    $('.errorJoinLeaveClub').css('display','none');
-    var clubId = localStorage.getItem("clubId");
-    var password = $('#passwordShowPVJoin').val();
-    if(password == '') {
-      $('.successJoinLeaveClub').css('display','none');
-      $('.errorJoinLeaveClub').css("display","block");
-      $('.errorJoinLeaveClub').text("Password is invalid");
-      return;
+  // Add a new useEffect to handle data refresh when wallet connects
+  useEffect(() => {
+    if (isConnected && address) {
+      fetchClubData();
+      verifyUserInClub();
     }
-    const my_wallet = await web3.eth.accounts.wallet.load(password);
-    
-    if(my_wallet !== undefined)
-    {
-      if(clubId != null) {
-        $('.successJoinLeaveClub').css("display","block");
-          $('.successJoinLeaveClub').text("Joining the club...");
-        await getContract();
-        if(contractPublic != undefined) {
-          
-          const query = contractPublic.methods.joinClub(clubId);
-          const encodedABI = query.encodeABI();
-  
-  
-  
-          
-            if (web3 && web3.eth) {
-              try {
-                const abi = ABI.abi;
-              const iface = new ethers.utils.Interface(abi);
-              const encodedData = iface.encodeFunctionData("joinClub", [clubId]);
-              const GAS_MANAGER_POLICY_ID = "479c3127-fb07-4cc6-abce-d73a447d2c01";
-          
-              const signer = provider.getSigner();
+  }, [isConnected, address]);
 
-              console.log("singer",signer);
-              const tx = {
-                to: marketplaceAddress,
-                data: encodedData,
-              };
-              const txResponse = await signer.sendTransaction(tx);
-              const txReceipt = await txResponse.wait();
-
-              notification.success({
-                message: 'Transaction Successful',
-                description: (
-                  <div>
-                    Transaction Hash: <a href={`https://aeneid.storyscan.io/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
-                  </div>
-                )
-              });
-
-              console.log(txReceipt.transactionHash);
-              } catch (error) {
-                console.error('Error sending signed transaction:', error);
-              }
-            } else {
-              console.error('web3 instance is not properly initialized.');
-            }
-  
-          }
+  // Add a new useEffect to handle initial data load
+  useEffect(() => {
+    const loadInitialData = async () => {
+      const clubId = localStorage.getItem("clubId");
+      if (clubId) {
+        await fetchClubData();
+        await verifyUserInClub();
       }
-      $('.errorJoinLeaveClub').css('display','none');
-      $('.successJoinLeaveClub').css("display","block");
-      $('.successJoinLeaveClub').text("You have joined the club successfully");
-    } else {
-      $('.successJoinLeaveClub').css('display','none');
-      $('.errorJoinLeaveClub').css("display","block");
-      $('.errorJoinLeaveClub').text("Password is invalid");
+    };
+    loadInitialData();
+  }, []);
+
+  async function verifyUserInClub() {
+    try {
+      const clubId = localStorage.getItem("clubId");
+      if (!clubId) {
+        return;
+      }
+
+      const user = await publicClient.readContract({
+        address: marketplaceAddress,
+        abi: ABI.abi,
+        functionName: 'isMemberOfClub',
+        args: [address, clubId],
+      });
+
+      // Hide all cards first
+      $('.join_club').hide();
+      $('.leave_club').hide();
+
+      if (user) {
+        // User is a member - show contribute and leave options
+        $('.leave_club').show();
+      } else {
+        // User is not a member - show join option
+        $('.join_club').show();
+      }
+    } catch (error) {
+      console.error("Error verifying user in club:", error);
     }
   }
-  
 
+  async function contributeClub() {
+    try {
+      if (!isConnected || !address || !walletClient) {
+        await openConnectModal();
+        return;
+      }
+
+      const clubId = localStorage.getItem("clubId");
+      const amountAE = $('#aeAmount').val();
+
+      if(!amountAE || amountAE <= 0) {
+        toast.error("Amount must be more than 0");
+        return;
+      }
+
+      if(!clubId) {
+        toast.error("Club ID not found");
+        return;
+      }
+
+      await getContract(address);
+      
+      if(!contractPublic) {
+        return;
+      }
+
+      const amountInWei = web3.utils.toWei(amountAE.toString(), 'ether');
+      const gasPrice = await publicClient.getGasPrice();
+      
+      const tx = {
+        to: marketplaceAddress,
+        data: contractPublic.methods.contributeToClub(clubId).encodeABI(),
+        value: amountInWei,
+        gasLimit: 300000,
+        maxFeePerGas: web3.utils.toWei((Number(gasPrice) * 2).toString(), 'wei'),
+        maxPriorityFeePerGas: web3.utils.toWei('1', 'gwei'),
+      };
+
+      const hash = await walletClient.sendTransaction(tx);
+      toast.info("Transaction sent! Waiting for confirmation...");
+      
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      
+      toast.success("Contribution successful!");
+      $('#aeAmount').val('');
+      fetchClubData();
+
+    } catch(e) {
+      console.error("Transaction error:", e);
+      toast.error(e.message || "Error contributing to club");
+    }
+  }
+
+  async function leaveClub() {
+    try {
+      if (!isConnected || !address || !walletClient) {
+        await openConnectModal();
+        return;
+      }
+
+      const clubId = localStorage.getItem("clubId");
+      if(!clubId) {
+        toast.error("Club ID not found");
+        return;
+      }
+
+      await getContract(address);
+      
+      if(!contractPublic) {
+        return;
+      }
+
+      const abi = ABI.abi;
+      const iface = new ethers.utils.Interface(abi);
+      const encodedData = iface.encodeFunctionData("leaveClub", [clubId]);
+      
+      const gasPrice = await publicClient.getGasPrice();
+      
+      const tx = {
+        to: marketplaceAddress,
+        data: encodedData,
+        gasLimit: 300000,
+        maxFeePerGas: web3.utils.toWei((Number(gasPrice) * 2).toString(), 'wei'),
+        maxPriorityFeePerGas: web3.utils.toWei('1', 'gwei'),
+      };
+
+      const hash = await walletClient.sendTransaction(tx);
+      toast.info("Transaction sent! Waiting for confirmation...");
+      
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+      toast.success("Successfully left club");
+      verifyUserInClub();
+
+    } catch(error) {
+      console.error(error);
+      toast.error(error.message || "Error leaving club");
+    }
+  }
+
+  async function joinClub() {
+    try {
+      if (!isConnected || !address || !walletClient) {
+        await openConnectModal();
+        return;
+      }
+
+      const clubId = localStorage.getItem("clubId");
+      if(!clubId) {
+        toast.error("Club ID not found");
+        return;
+      }
+
+      await getContract(address);
+      
+      if(!contractPublic) {
+        return;
+      }
+
+      const abi = ABI.abi;
+      const iface = new ethers.utils.Interface(abi);
+      const encodedData = iface.encodeFunctionData("joinClub", [clubId]);
+      
+      const gasPrice = await publicClient.getGasPrice();
+      
+      const tx = {
+        to: marketplaceAddress,
+        data: encodedData,
+        gasLimit: 300000,
+        maxFeePerGas: web3.utils.toWei((Number(gasPrice) * 2).toString(), 'wei'),
+        maxPriorityFeePerGas: web3.utils.toWei('1', 'gwei'),
+      };
+
+      const hash = await walletClient.sendTransaction(tx);
+      toast.info("Transaction sent! Waiting for confirmation...");
+      
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+      toast.success("Successfully joined club");
+      verifyUserInClub();
+
+    } catch(error) {
+      console.error('Error joining club:', error);
+      toast.error(error.message || "Error joining club");
+    }
+  }
 
   function Logout(){
     web3.eth.accounts.wallet.clear();
@@ -364,17 +365,8 @@ function Club() {
   
   }
 
-
-
   return (
     <div id="page-top">
-      <WalletConnectModal 
-        isOpen={showWalletModal} 
-        onClose={() => {
-          setShowWalletModal(false);
-          navigate('/login');
-        }} 
-      />
       <div id="wrapper">
         {/* Sidebar */}
         <ul
@@ -569,56 +561,42 @@ function Club() {
                     {/* Card Body */}
                     <div className="card-body">
                       <div className="row available_proposals">
-                        <span className="loading_message">Loading...</span>
-                        <GetProposals />
+                        {isConnected ? (
+                          <GetProposals />
+                        ) : (
+                          <div className="col-12 text-center">
+                            <p>Please connect your wallet to view proposals</p>
+                            <button 
+                              className="btn btn-primary"
+                              onClick={openConnectModal}
+                            >
+                              Connect Wallet
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
                 </div>
                 {/* Pie Chart */}
                 <div className="col-xl-4 col-lg-5">
-                  <div
-                    className="card shadow mb-4 join_club"  style={{display: "none"}}
-                    
-                  >
+                  <div className="card shadow mb-4 join_club" style={{display: "none"}}>
                     <div className="card-header py-3">
-                      <h6 className="m-0 font-weight-bold text-primary">
-                        Join the club
-                      </h6>
-                    </div>
-                    <div className="card-body">
-                      <p>
-                        
-                        <div id="btnJoinClub" onClick={() => {
-                          joinClub();
-                        }} className="btn btn-success">
-                          Confirm
-                        </div>{" "}
-                        <br />
-                      </p>
-                      <div
-                        className="successJoinLeaveClub valid-feedback"
-                        style={{ display: "none" }}
-                      />
-                      <div
-                        className="errorJoinLeaveClub invalid-feedback"
-                        style={{ display: "none" }}
-                      />
-                      <p />
-                    </div>
-                  </div>
-                  <div
-                    className="card shadow mb-4 leave_club"
-                    style={{ display: "none" }}
-                  >
-                    <div className="card-header py-3">
-                      <h6 className="m-0 font-weight-bold text-primary">
-                        Contribute to the club
-                      </h6>
+                      <h6 className="m-0 font-weight-bold text-primary">Join the club</h6>
                     </div>
                     <div className="card-body">
                       <div className="form-group">
-                        <label htmlFor="aeAmount">Amount of IP:</label>
+                        <button className="btn btn-primary" onClick={joinClub}>Join Club</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="card shadow mb-4 leave_club" style={{display: "none"}}>
+                    <div className="card-header py-3">
+                      <h6 className="m-0 font-weight-bold text-primary">Contribute to the club</h6>
+                    </div>
+                    <div className="card-body">
+                      <div className="form-group">
                         <input
                           type="number"
                           id="aeAmount"
@@ -628,50 +606,20 @@ function Club() {
                           step="0.000000000000000001"
                         />
                       </div>
-                      <button
-                        onClick={contributeClub}
-                        className="btn btn-success btn-block mt-3"
-                      >
+                      <button onClick={contributeClub} className="btn btn-success btn-block mt-3">
                         Contribute
                       </button>
-                      <div
-                        className="successContributeClub valid-feedback"
-                        style={{ display: "none" }}
-                      />
-                      <div
-                        className="errorContributeClub invalid-feedback"
-                        style={{ display: "none" }}
-                      />
                     </div>
                   </div>
-                  <div
-                    className="card shadow mb-4 leave_club"
-                    style={{ display: "none" }}
-                  >
+
+                  <div className="card shadow mb-4 leave_club" style={{display: "none"}}>
                     <div className="card-header py-3">
-                      <h6 className="m-0 font-weight-bold text-primary">
-                        Leave the club
-                      </h6>
+                      <h6 className="m-0 font-weight-bold text-primary">Leave the club</h6>
                     </div>
                     <div className="card-body">
-                      <p>
-                       
-                        <div  id="btnLeaveClub"  onClick={() => {
-                          leaveClub();
-                        }} className="btn btn-success">
-                          Confirm
-                        </div >{" "}
-                        <br />
-                      </p>
-                      <div
-                        className="successJoinLeaveClub valid-feedback"
-                        style={{ display: "none" }}
-                      />
-                      <div
-                        className="errorJoinLeaveClub invalid-feedback"
-                        style={{ display: "none" }}
-                      />
-                      <p />
+                      <button onClick={leaveClub} className="btn btn-success">
+                        Leave Club
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -774,6 +722,18 @@ function Club() {
           </div>
         </div>
       </div>
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark"
+      />
     </div>
     
     )
