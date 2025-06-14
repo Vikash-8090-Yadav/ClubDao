@@ -746,6 +746,30 @@ function ProposalContent() {
                       <h6 className="m-0 font-weight-bold text-primary">Proposal Details</h6>
                     </div>
                     <div className="card-body">
+                      {/* Add Proposal ID Display */}
+                      <div className="row mb-4">
+                        <div className="col-12">
+                          <div className="bg-success text-white p-5 rounded text-center" style={{ 
+                            fontSize: '1.5rem',
+                            minHeight: '200px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                            border: '4px solid #28a745'
+                          }}>
+                            <div className="font-weight-bold mb-3" style={{ fontSize: '2rem' }}>Proposal ID</div>
+                            <div style={{ 
+                              fontSize: '4rem', 
+                              fontWeight: 'bold',
+                              textShadow: '2px 2px 4px rgba(0,0,0,0.2)'
+                            }}>
+                              {proposalData?.id ? Number(proposalData.id) : 'Loading...'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                       <div className="row">
                         <div className="col-md-12">
                           <div className="form-group">

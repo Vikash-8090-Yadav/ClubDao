@@ -47,11 +47,17 @@ const GetProposals = () => {
         }
 
         console.log("Fetching proposals for club:", clubId);
-        const clubs = await contract.methods.getProposalsByClub(clubId).call();
-        console.log("Proposals fetched:", clubs);
+        const proposals = await contract.methods.getProposalsByClub(clubId).call();
+        console.log("Proposals fetched:", proposals);
         
-        if (clubs && clubs.length > 0) {
-          setProposals(clubs);
+        if (proposals && proposals.length > 0) {
+          // Convert proposal IDs to numbers and ensure they're properly formatted
+          const formattedProposals = proposals.map(proposal => ({
+            ...proposal,
+            id: Number(proposal.id)
+          }));
+          console.log("Formatted proposals:", formattedProposals);
+          setProposals(formattedProposals);
         } else {
           setProposals([]);
         }
@@ -94,10 +100,20 @@ const GetProposals = () => {
           <tr key={proposal.id}>
             <td>
               <button 
-                className="btn btn-success"
+                className="btn btn-success btn-sm"
                 onClick={() => changeProposal(proposal.id)}
+                style={{
+                  fontSize: '0.875rem',
+                  padding: '0.375rem 0.75rem',
+                  minWidth: '80px',
+                  fontWeight: 'bold',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  border: '1px solid #28a745'
+                }}
               >
-                {proposal.id}
+                <span style={{ color: 'white' }}>
+                  {proposal.id.toString()}
+                </span>
               </button>
             </td>
             <td><b>{proposal.description}</b></td>

@@ -17,6 +17,7 @@ function GetProposalById() {
   const [proposalData, setProposalData] = useState(null);
   const { address, isConnected } = useAccount();
   const navigate = useNavigate();
+  const [proposalId, setProposalId] = useState(null);
 
   async function getContract(userAddress) {
     try {
@@ -48,13 +49,14 @@ function GetProposalById() {
         setError(null);
 
         const clubId = localStorage.getItem("clubId");
-        const proposalId = localStorage.getItem("proposalId");
+        const id = localStorage.getItem("proposalId");
+        setProposalId(id);
 
-        if (!clubId || !proposalId) {
+        if (!clubId || !id) {
           throw new Error("Club ID or Proposal ID not found");
         }
 
-        console.log("Starting to fetch data for Club ID:", clubId, "Proposal ID:", proposalId);
+        console.log("Starting to fetch data for Club ID:", clubId, "Proposal ID:", id);
         const contract = await getContract(address);
 
         if (!contract) {
@@ -62,7 +64,7 @@ function GetProposalById() {
         }
 
         // Fetch proposal data
-        const proposal = await contract.methods.getProposalById(clubId, proposalId).call();
+        const proposal = await contract.methods.getProposalById(clubId, id).call();
         console.log("Proposal data:", proposal);
 
         if (!proposal) {
@@ -171,8 +173,29 @@ function GetProposalById() {
             <div className="card-body">
               <div className="row">
                 <div className="col-12 mb-4">
-                  <div className="bg-success text-white p-3 rounded" style={{ minHeight: '100px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <h3 className="mb-0">Proposal ID: {proposalData.Cid || 'No CID'}</h3>
+                  <div 
+                    style={{
+                      padding: '30px',
+                      fontSize: '32px',
+                      fontWeight: 'bold',
+                      borderRadius: '15px',
+                      border: '4px solid #28a745',
+                      backgroundColor: '#28a745',
+                      color: '#ffffff',
+                      boxShadow: '0 6px 12px rgba(0,0,0,0.2)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '100%',
+                      minHeight: '200px',
+                      margin: '20px 0',
+                      textAlign: 'center'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: '24px', marginBottom: '10px' }}>Proposal ID</div>
+                      <div style={{ fontSize: '48px' }}>{proposalId || 'No ID'}</div>
+                    </div>
                   </div>
                 </div>
                 <div className="col-12">

@@ -5,54 +5,52 @@ import Tg from "../components/toggle";
 import $ from 'jquery'; 
 import { useNavigate } from 'react-router-dom';
 import {Web3} from 'web3';
-
+import { useAccount } from 'wagmi';
 
 const web3 = new Web3(new Web3.providers.HttpProvider("https://lightnode-json-rpc-story.grandvalleys.com"));
 
 function JoinClub() {
   const navigate = useNavigate();
+  const { address, isConnected } = useAccount();
+
   function Logout(){
     web3.eth.accounts.wallet.clear();
     localStorage.clear();
     navigate('/login');
-  
   }
- 
-  
 
-    useEffect(() => {
-        {
-          if(localStorage.getItem('filWalletAddress') != null) {
-            checkBalance();
-    
-            const myWallet = localStorage.getItem("filWalletAddress")
-            $('.current_account_text').text(myWallet);
-          }
-            GetClubs(); 
-        }
-      }, []);
+  useEffect(() => {
+    if (isConnected && address) {
+      checkBalance();
+      $('.current_account_text').text(address);
+    }
+    GetClubs();
+  }, [isConnected, address]);
 
-      async function checkBalance() {
-  
-        try {
-          const myWallet = localStorage.getItem("filWalletAddress");
-          if (!myWallet) {
-            // Handle the case where the wallet address is not available in localStorage
-            return;
-          }
-          
-          // Assuming you've properly initialized the web3 instance before this point
-          const balanceWei = await web3.eth.getBalance(myWallet);
-          
-          // Convert Wei to Ether (assuming Ethereum)
-          const balanceEther = web3.utils.fromWei(balanceWei, "ether");
-          
-          // Update the balance on the page
-          $('.view_balance_address').text(balanceEther);
-        } catch (error) {
-          console.error("Error:", error);
-        }
+  async function checkBalance() {
+    try {
+      if (!address) {
+        console.log("No wallet address found");
+        return;
       }
+      
+      // Get balance in wei
+      const balanceWei = await web3.eth.getBalance(address);
+      console.log("Raw balance in wei:", balanceWei);
+      
+      // Convert Wei to Ether
+      const balanceEther = web3.utils.fromWei(balanceWei, "ether");
+      console.log("Converted balance in ether:", balanceEther);
+      
+      // Update the balance display
+      $('.view_balance_address').text(balanceEther);
+      
+    } catch (error) {
+      console.error("Error checking balance:", error);
+      $('.view_balance_address').text('Error');
+    }
+  }
+
   return (
     <div id="page-top"> 
     {/* Page Wrapper */}

@@ -140,26 +140,20 @@ function GetMyClubsContent() {
             <tr key={club.clubId}>
               <td>
                 <button 
-                  className="btn btn-success"
+                  className="btn btn-success btn-sm"
                   style={{
-                    padding: '12px 24px',
-                    fontSize: '16px',
-                    minWidth: '120px',
+                    fontSize: '0.875rem',
+                    padding: '0.375rem 0.75rem',
+                    minWidth: '80px',
                     fontWeight: 'bold',
-                    borderRadius: '8px',
-                    border: '2px solid #28a745',
-                    backgroundColor: '#f8f9fa',
-                    color: '#28a745',
                     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                    transition: 'all 0.3s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer'
+                    border: '1px solid #28a745'
                   }}
                   onClick={() => changeClub(club.clubId)}
                 >
-                  {String(club.clubId)}
+                  <span style={{ color: 'white' }}>
+                    {String(club.clubId)}
+                  </span>
                 </button>
               </td>
               <td><b>{club.name}</b></td>
