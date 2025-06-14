@@ -9,6 +9,9 @@ import { marketplaceAddress } from "../config";
 import {Web3} from 'web3';
 import $ from 'jquery'; 
 import ABI from "../SmartContract/artifacts/contracts/InvestmentClub.sol/InvestmentClub.json"
+import { TomoEVMKitProvider, useConnectModal, useAccountModal } from '@tomo-inc/tomo-evm-kit';
+import { useAccount, useSignMessage, useSignTypedData, usePublicClient, useWalletClient, useChainId } from 'wagmi';
+import { parseEther } from 'viem';
 const ethers = require("ethers")
 const web3 = new Web3(new Web3.providers.HttpProvider("https://lightnode-json-rpc-story.grandvalleys.com"));
 
@@ -17,18 +20,23 @@ const provider = new ethers.providers.Web3Provider(window.ethereum);
 const owneraddress = localStorage.getItem("filWalletAddress");
 let contractPublic = null;
 
-function CreateClub() {
+function CreateClubContent() {
+  const { address, isConnected } = useAccount();
+  const { openConnectModal } = useConnectModal();
+  const { openAccountModal } = useAccountModal();
+  const { signMessage } = useSignMessage();
+  const { signTypedData } = useSignTypedData();
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
+  const chainId = useChainId();
   const [clubName, setClubName] = useState('');
   const [password, setPassword] = useState('');
 
   async function checkBalance() {
     try {
-      const myWallet = localStorage.getItem("filWalletAddress");
-      if (!myWallet) {
-        return;
-      }
-      const balanceWei = await web3.eth.getBalance(myWallet);
-      const balanceEther = web3.utils.fromWei(balanceWei, "ether");
+      if (!address) return;
+      const balance = await publicClient.getBalance({ address });
+      const balanceEther = ethers.utils.formatEther(balance);
       $('.view_balance_address').text(balanceEther);
     } catch (error) {
       console.error("Error:", error);
@@ -47,96 +55,84 @@ function CreateClub() {
       theme: "dark",
     });
 
-    async function getContract(userAddress) {
-      contractPublic = new web3.eth.Contract(ABI.abi, marketplaceAddress);
-      if(userAddress != null && userAddress != undefined) {
-        contractPublic.defaultAccount = userAddress;
+    try {
+      if (!isConnected || !address || !walletClient) {
+        await openConnectModal();
+        return;
       }
-    }
 
-    var walletAddress = localStorage.getItem("filWalletAddress");
-    var password = $('#trx_password').val();
-    await getContract(walletAddress);
-
-    if(contractPublic != null) {
-      var clubName = $('#club_name').val();
+      const clubName = $('#club_name').val();
       if(clubName == '') {
         $('#errorCreateClub').css("display","block");
         $('#errorCreateClub').text("Club name is invalid");
         return;
       }
-      if(password == '') {
-        $('#errorCreateClub').css("display","block");
-        $('#errorCreateClub').text("Password is invalid");
-        return;
-      }
 
-      const my_wallet = await web3.eth.accounts.wallet.load(password);
+      $('.loading_message_creating').css("display","block");
       
-      if(my_wallet !== undefined) {
-        try {
-          $('.loading_message_creating').css("display","block");
-          
-          const abi = ABI.abi;
-          const iface = new ethers.utils.Interface(abi);
-          const encodedData = iface.encodeFunctionData("createClub", [clubName, ""]);
-          
-          await provider.send('eth_requestAccounts', []);
-          const signer = provider.getSigner();
-          
-          const tx = {
-            to: marketplaceAddress,
-            data: encodedData,
-          };
-          
-          const txResponse = await signer.sendTransaction(tx);
-          const txReceipt = await txResponse.wait();
+      const abi = ABI.abi;
+      const iface = new ethers.utils.Interface(abi);
+      const encodedData = iface.encodeFunctionData("createClub", [clubName, ""]);
+      
+      // Get gas price
+      const gasPrice = await publicClient.getGasPrice();
+      
+      // Prepare the transaction
+      const tx = {
+        account: address,
+        to: marketplaceAddress,
+        data: encodedData,
+        chainId: chainId,
+        gasPrice: gasPrice,
+        value: parseEther('0'), // Add value if needed
+      };
 
-          notification.success({
-            message: 'Transaction Successful',
-            description: (
-              <div>
-                Transaction Hash: <a href={`https://aeneid.storyscan.io/tx/${txReceipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{txReceipt.transactionHash}</a>
-              </div>
-            )
-          });
+      console.log('Sending transaction:', tx);
 
-          $('#club_name').val('');
-          $('#errorCreateClub').css("display","none");
-          $('.loading_message_creating').css("display","none");
-          $('#successCreateClub').css("display","block");
-          toast.success("Club created successfully with the name: " + clubName);
-          $('#successCreateClub').text("Club created successfully with the name: " + clubName);
-        } catch(e) {
-          console.log(e);
-          $('.valid-feedback').css('display','none');
-          $('.invalid-feedback').css('display','block');
-          $('.loading_message_creating').css("display","none");
-          $('.invalid-feedback').text(e);
-        }
-      } else {
-        $('.valid-feedback').css('display','none');
-        $('.invalid-feedback').css('display','block');
-        $('.loading_message_creating').css("display","none");
-        $('.invalid-feedback').text('The password is invalid');
-      }
+      // Send the transaction
+      const hash = await walletClient.sendTransaction(tx);
+      console.log('Transaction hash:', hash);
+      
+      // Wait for the transaction to be mined
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      console.log('Transaction receipt:', receipt);
+      
+      notification.success({
+        message: 'Transaction Successful',
+        description: (
+          <div>
+            Transaction Hash: <a href={`https://aeneid.storyscan.io/tx/${receipt.transactionHash}`} target="_blank" rel="noopener noreferrer">{receipt.transactionHash}</a>
+          </div>
+        )
+      });
+
+      $('#club_name').val('');
+      $('#errorCreateClub').css("display","none");
+      $('.loading_message_creating').css("display","none");
+      $('#successCreateClub').css("display","block");
+      toast.success("Club created successfully with the name: " + clubName);
+      $('#successCreateClub').text("Club created successfully with the name: " + clubName);
+    } catch(e) {
+      console.error('Transaction error:', e);
+      $('.valid-feedback').css('display','none');
+      $('.invalid-feedback').css('display','block');
+      $('.loading_message_creating').css("display","none");
+      $('.invalid-feedback').text(e.message || 'Transaction failed');
     }
   }
 
   const navigate = useNavigate();
   function Logout(){
-    web3.eth.accounts.wallet.clear();
     localStorage.clear();
     navigate('/login');
   }
 
   useEffect(() => {
-    if(localStorage.getItem('filWalletAddress') != null) {
+    if(address) {
       checkBalance();
-      const myWallet = localStorage.getItem("filWalletAddress")
-      $('.current_account_text').text(myWallet);
+      $('.current_account_text').text(address);
     }
-  }, []);
+  }, [address]);
 
   return (
     <div id="page-top">
@@ -422,6 +418,15 @@ function CreateClub() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Wrap the component with TomoEVMKitProvider
+function CreateClub() {
+  return (
+    <TomoEVMKitProvider>
+      <CreateClubContent />
+    </TomoEVMKitProvider>
   );
 }
 
